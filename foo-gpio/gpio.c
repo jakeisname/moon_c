@@ -257,9 +257,9 @@ static int foo_gpio_probe(struct platform_device *pdev)
 			"gpio-ranges");
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0))
-	ret = gpiochip_add_data(gc, chip);
+	ret = devm_gpiochip_add_data(dev, gc, chip);
 #else
-	ret = gpiochip_add(gc);
+	ret = devm_gpiochip_add(dev, gc);
 #endif
 	if (ret < 0) {
 		dev_err(dev, "unable to add GPIO chip\n");
@@ -297,7 +297,7 @@ static int foo_gpio_probe(struct platform_device *pdev)
 		goto err_rm_gpiochip;
 	}
 
-	parent_irq = irq = platform_get_irq(pdev, 0);
+	parent_irq = platform_get_irq(pdev, 0);
 	gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, parent_irq,
 			foo_parent_gpio_irq_handler);
 
@@ -307,7 +307,7 @@ static int foo_gpio_probe(struct platform_device *pdev)
 	return 0;
 
 err_rm_gpiochip:
-	gpiochip_remove(gc);
+	platform_set_drvdata(pdev, NULL);
 
 	return ret;
 }
@@ -315,10 +315,11 @@ err_rm_gpiochip:
 static int foo_gpio_remove(struct platform_device *pdev)
 {
 	struct foo_gpio *chip = platform_get_drvdata(pdev);
+	
+	platform_set_drvdata(pdev, NULL);
 
 	printk(KERN_INFO "%s chip=%p, foo_count=%d\n",
 		 __func__, chip, foo_count);
-	gpiochip_remove(&chip->gc);
 
 	return 0;
 }

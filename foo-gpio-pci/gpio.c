@@ -21,7 +21,7 @@ MODULE_LICENSE("GPL");
 #define DEBUG
 #endif
 
-#define DRV_NAME "virt"
+#define DRV_NAME "pci"
 #define NR_GPIOS 10
 
 #define VIRTUAL_GPIO_DATA       0x00
@@ -59,16 +59,17 @@ struct foo_gpio {
 	resource_size_t data_mmio_len;
 
 	/* void __iomem *base; */
-	/* void __iomem *io_ctrl; */
 
 	raw_spinlock_t lock;
 
 	struct gpio_chip gc;
 
 	/* irq related */
+#if 0
 	struct irq_chip_generic *icg;
 	struct irq_domain *irq_domain;
 	unsigned int irq;
+#endif
 
 	char (*msix_names)[256];
 	struct msix_entry *msix_entries;
@@ -378,7 +379,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	raw_spin_lock_init(&foo->lock);
 
 	/* pci related */
-	if((ret = pci_enable_device(pdev))){
+	if((ret = pcim_enable_device(pdev))){
 		dev_err(dev, "pci_enable_device probe error %d for device %s\n",
 				ret, pci_name(pdev));
 		return ret;
@@ -392,8 +393,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	/* bar2: data mmio region */
 	foo->data_mmio_start = pci_resource_start(pdev, 2);
 	foo->data_mmio_len   = pci_resource_len(pdev, 2);
-	foo->data_base_addr = ioremap_nocache(foo->data_mmio_start,
-			foo->data_mmio_len);
+	foo->data_base_addr = pcim_iomap(pdev, 2, 0);
 
 	if (!foo->data_base_addr) {
 		dev_err(dev, "cannot iomap region of size %lu\n",
@@ -412,11 +412,12 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	/* bar0: control registers */
 	foo->regs_start =  pci_resource_start(pdev, 0);
 	foo->regs_len = pci_resource_len(pdev, 0);
-	foo->regs_base_addr = pci_iomap(pdev, 0, 0x100);
+	foo->regs_base_addr = pcim_iomap(pdev, 0, 0x100);
+
 	if (!foo->regs_base_addr) {
 		dev_err(dev, "cannot ioremap registers of size %lu\n",
 				(unsigned long) foo->regs_len);
-		goto reg_release;
+		goto pci_release;
 	}
 
 	dev_info(dev, "bar0) registers base=0x%lx \n",
@@ -449,18 +450,18 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 			data, NULL, NULL, dir, NULL, 0);
 	if (ret) {
 		dev_err(dev, "Failed to register GPIOs: bgpio_init\n");
-		goto reg_release;
+		goto pci_release;
 	}
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0))
-	ret = gpiochip_add_data(gc, foo);
+	ret = devm_gpiochip_add_data(dev, gc, foo);
 #else
-	ret = gpiochip_add(gc);
+	ret = devm_gpiochip_add(dev, gc);
 #endif
-	if (ret < 0) {
+	if (ret) {
 		dev_err(dev, "unable to add GPIO chip\n");
-		return ret;
+		goto pci_release;
 	}
 
 	parent_irq = pdev->irq;
@@ -477,7 +478,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 				handle_simple_irq, IRQ_TYPE_NONE);
 		if (ret) {
 			dev_err(dev, "no GPIO irqchip\n");
-			goto err_rm_gpiochip;
+			goto pci_release;
 		}
 
 		gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, parent_irq,
@@ -485,10 +486,10 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	}
 
 #if 0
-	irq_base = irq_alloc_descs(-1, 0, ngpios, 0);
+	irq_base = devm_irq_alloc_descs(dev, -1, 0, ngpios, 0);
 	if (irq_base < 0) {
 		err = irq_base;
-		goto desc_release;
+		goto pci_release;
 	}
 
 	foo->irq_domain = irq_domain_add_linear(0, ngpios,
@@ -496,16 +497,16 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	if (!foo->irq_domain) {
 		err = -ENXIO;
 		dev_err(&pdev->dev, "cannot initialize irq domain\n");
-		goto desc_release;
+		goto pci_release;
 	}
 
 	irq_domain_associate_many(foo->irq_domain, irq_base, 0, ngpios);
 
-	icg = irq_alloc_generic_chip(DRV_NAME, 1, irq_base,
+	icg = devm_irq_alloc_generic_chip(devm, DRV_NAME, 1, irq_base,
 			foo->data_base_addr, handle_edge_irq);
 	if(!icg) {
 		dev_err(dev, "irq_alloc_generic_chip failed!\n");
-		goto chip_release;
+		goto pci_release;
 	}
 
 	ct = icg->chip_types;
@@ -524,7 +525,8 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	ct->regs.ack = VIRTUAL_GPIO_INT_EOI;
 	ct->regs.mask = VIRTUAL_GPIO_INT_EN;
 
-	irq_setup_generic_chip(gc, IRQ_MSK(VIRTUAL_GPIO_NR_GPIOS), 0, 0, 0);
+	devm_irq_setup_generic_chip(gc, 
+		IRQ_MSK(VIRTUAL_GPIO_NR_GPIOS), 0, 0, 0);
 
 	foo->gc.irqdomain = foo->irq_domain;
 
@@ -543,23 +545,11 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 	return 0;
 
-chip_release:
-	free_irq(pdev->irq, foo);
-	irq_remove_generic_chip(icg, 0, 0, 0);  
-	kfree(gc);
-desc_release:
-	irq_free_descs(icg->irq_base, ngpios);
-	pci_iounmap(pdev, foo->regs_base_addr);
-err_rm_gpiochip:
-	gpiochip_remove(gc);
-reg_release:
-	pci_iounmap(pdev, foo->data_base_addr);
-	pci_set_drvdata(pdev, NULL);
 pci_release:
+	pci_set_drvdata(pdev, NULL);
 	pci_release_regions(pdev);
-pci_disable:
-	pci_disable_device(pdev);
 
+pci_disable:
 	return ret;
 }
 
@@ -570,12 +560,8 @@ static void foo_gpio_remove(struct pci_dev *pdev)
 	printk(KERN_INFO "%s foo_chip=%p, foo_count=%d\n", 
 		__func__, foo, foo_count);
 
-	gpiochip_remove(&foo->gc);
-	pci_iounmap(pdev, foo->regs_base_addr);
-	pci_iounmap(pdev, foo->data_base_addr);
 	pci_set_drvdata(pdev, NULL);
 	pci_release_regions(pdev);
-	pci_disable_device(pdev);
 }
 
 
