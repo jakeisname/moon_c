@@ -21,8 +21,8 @@ MODULE_LICENSE("GPL");
 #define DEBUG
 #endif
 
-#define VIRTUAL_GPIO_DEV_NAME "foo-gpio"
-#define VIRTUAL_GPIO_NR_GPIOS 10
+#define DRV_NAME "virt"
+#define NR_GPIOS 10
 
 #define VIRTUAL_GPIO_DATA       0x00
 #define VIRTUAL_GPIO_OUT_EN     0x04
@@ -46,7 +46,7 @@ enum {
 
 struct foo_gpio {
 	struct device *dev;
-	struct pci_dev *pci_dev;
+	struct pci_dev *pdev;
 
 	/* mmio control registers */
 	void __iomem    *regs_base_addr;
@@ -68,18 +68,16 @@ struct foo_gpio {
 	/* irq related */
 	struct irq_chip_generic *icg;
 	struct irq_domain *irq_domain;
-	unsigned num_banks;
 	unsigned int irq;
 
 	char (*msix_names)[256];
 	struct msix_entry *msix_entries;
 	int nvectors;
-
-	bool pinmux_is_supported;
-
-	struct pinctrl_dev *pctl;
-	struct pinctrl_desc *pctldesc;
 };
+
+/*****************************************************************
+ * 1) gpio_chip part
+ *****************************************************************/
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0))
 static inline struct foo_gpio *foo_gpiochip_get_data(struct gpio_chip *gc2)
@@ -100,10 +98,8 @@ static int foo_gpio_request(struct gpio_chip *gc, unsigned offset)
 	unsigned gpio = gc->base + offset;
 
 	printk(KERN_INFO "%s offset=%u, gpio=%u\n", __func__, offset, gpio);
-	if (!foo->pinmux_is_supported)
-		return 0;
 
-	return pinctrl_request_gpio(gpio);
+	return 0;
 }
 
 static void foo_gpio_free(struct gpio_chip *gc, unsigned offset)
@@ -112,10 +108,6 @@ static void foo_gpio_free(struct gpio_chip *gc, unsigned offset)
 	unsigned gpio = gc->base + offset;
 
 	printk(KERN_INFO "%s offset=%u, gpio=%u\n", __func__, offset, gpio);
-	if (!foo->pinmux_is_supported)
-		return;
-
-	pinctrl_free_gpio(gpio);
 }
 
 static int foo_gpio_direction_output(struct gpio_chip *gc,
@@ -172,7 +164,7 @@ static void foo_gpio_set(struct gpio_chip *gc, unsigned offset, int val)
 
 
 /*****************************************************************
- * irq_chip
+ * 2) irq_chip part
  *****************************************************************/
 
 static irqreturn_t foo_my_irq_handler(int irq, void * private)
@@ -184,10 +176,9 @@ static irqreturn_t foo_my_irq_handler(int irq, void * private)
 		return IRQ_NONE;
 
 	status = readl(foo->regs_base_addr + IntrStatus);
+	printk(KERN_INFO "%s status=0x%04x\n", __func__, status);
 	if (!status || (status == 0xFFFFFFFF))
 		return IRQ_NONE;
-
-	printk(KERN_INFO "%s status=0x%04x\n", __func__, status);
 
 	return IRQ_HANDLED;
 }
@@ -199,9 +190,14 @@ static void foo_gpio_irq_handler(struct irq_desc *desc)
 	unsigned pin = 0;
 	int child_irq = 0;
 
+	printk(KERN_INFO "%s irq=%d, hw_irq=%lu\n", 
+		__func__, desc->irq_data.irq, desc->irq_data.hwirq);
+
 	chained_irq_enter(irq_chip, desc);
 
 	child_irq = irq_find_mapping(gc->irqdomain, pin);
+
+	printk(KERN_INFO "%s child_irq=%d\n", __func__, child_irq);
 
 	generic_handle_irq(child_irq);
 
@@ -271,24 +267,15 @@ static int foo_gpio_to_irq(struct gpio_chip *gc, unsigned pin)
 }
 
 /*****************************************************************
- * probe
+ * 3) pci driver probe part
  *****************************************************************/
-
-static struct pci_device_id foo_gpio_id_table[] = {
-	{ 0x1af4, 0x1110, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 32 },
-	{ 0 },
-};
-MODULE_DEVICE_TABLE (pci, foo_gpio_id_table);
-
 
 static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 {
 	int i, err;
-	const char *name = "ivshmem";
+	const char *name = DRV_NAME;
 
-	printk(KERN_INFO "devname is %s\n", name);
 	foo->nvectors = nvectors;
-
 
 	foo->msix_entries = kmalloc(nvectors * sizeof *foo->msix_entries,
 			GFP_KERNEL);
@@ -298,14 +285,13 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 	for (i = 0; i < nvectors; ++i)
 		foo->msix_entries[i].entry = i;
 
-	err = pci_enable_msix_exact(foo->pci_dev, foo->msix_entries,
+	err = pci_enable_msix_exact(foo->pdev, foo->msix_entries,
 			foo->nvectors);
 	if (err > 0) {
 		printk(KERN_INFO "no MSI. Back to INTx.\n");
 		return -ENOSPC;
 	}
-
-	if (err) {
+	else if (err) {
 		printk(KERN_INFO "some error below zero %d\n", err);
 		return err;
 	}
@@ -338,15 +324,13 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	struct gpio_chip *gc;
 	struct irq_chip_generic *icg;
 	struct irq_chip_type *ct;
-	u32 ngpios;
-	int irq, ret;
+	u32 ngpios = NR_GPIOS;
+	int irq = 0;
+	int ret;
 	void __iomem *data;
 	void __iomem *dir;
 
 	printk(KERN_INFO "%s\n", __func__);
-
-	if (!of_device_is_compatible(dev->of_node, "foo,foo-gpio"))
-		return -ENOMEM;
 
 	foo = devm_kzalloc(dev, sizeof(*foo), GFP_KERNEL);
 	if (!foo)
@@ -354,12 +338,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 	foo->dev = dev;
 	pci_set_drvdata(pdev, foo);
-	foo->pci_dev = pdev;
-
-	if (of_property_read_u32(dev->of_node, "ngpios", &ngpios)) {
-		dev_err(&pdev->dev, "missing ngpios DT property\n");
-		return -ENODEV;
-	}
+	foo->pdev = pdev;
 
 	raw_spin_lock_init(&foo->lock);
 
@@ -370,7 +349,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		return ret;
 	}
 
-	if((ret = pci_request_regions(pdev, "foo-gpio-pci")) < 0){
+	if((ret = pci_request_regions(pdev, DRV_NAME)) < 0){
 		dev_err(dev, "pci_request_regions error %d\n", ret);
 		goto pci_disable;
 	}
@@ -387,10 +366,10 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		goto pci_release;
 	}
 
-	dev_dbg(dev, "bar2) data_mmio iomap base = 0x%lx \n",
+	dev_info(dev, "bar2) data base=0x%lx\n",
 			(unsigned long) foo->data_base_addr);
 
-	dev_dbg(dev, "bar2) data_mmio_start = 0x%lx data_mmio_len = %lu\n",
+	dev_info(dev, "bar2) data start=0x%lx, len=0x%lx\n",
 			(unsigned long) foo->data_mmio_start,
 			(unsigned long) foo->data_mmio_len);
 
@@ -405,10 +384,10 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		goto reg_release;
 	}
 
-	dev_dbg(dev, "bar0) regs base = 0x%lx \n",
+	dev_info(dev, "bar0) registers base=0x%lx \n",
 			(unsigned long) foo->regs_base_addr);
 
-	dev_dbg(dev, "bar0) regs_start = 0x%lx regs_len = %lu\n",
+	dev_info(dev, "bar0) registers start=0x%lx, len=0x%lx\n",
 			(unsigned long) foo->regs_start,
 			(unsigned long) foo->regs_len);
 
@@ -416,11 +395,10 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	iowrite32(0xffff, foo->regs_base_addr + IntrMask);
 
 	gc = &foo->gc;
-	gc->base = -1;
 	gc->ngpio = ngpios;
 	gc->label = dev_name(dev);
+	gc->owner = THIS_MODULE;
 	gc->parent = dev;
-	gc->of_node = dev->of_node;
 	gc->request = foo_gpio_request;
 	gc->free = foo_gpio_free;
 	gc->direction_input = foo_gpio_direction_input;
@@ -429,12 +407,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	gc->get = foo_gpio_get;
 	gc->to_irq = foo_gpio_to_irq;
 
-	//foo->regs.ack = VIRTUAL_GPIO_INT_EOI; /* 0x10 */
-	//     foo->regs.mask = VIRTUAL_GPIO_INT_EN; /* 0x08 */
-	foo->num_banks = 1;
-	foo->pinmux_is_supported = of_property_read_bool(dev->of_node,
-			"gpio-ranges");
-
+#if 0
 	data = foo->data_base_addr + VIRTUAL_GPIO_DATA;
 	dir = foo->data_base_addr + VIRTUAL_GPIO_OUT_EN;
 	ret = bgpio_init(gc, dev, BITS_TO_BYTES(ngpios),
@@ -443,6 +416,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		dev_err(dev, "Failed to register GPIOs: bgpio_init\n");
 		goto reg_release;
 	}
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0))
 	ret = gpiochip_add_data(gc, foo);
@@ -455,30 +429,19 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	}
 
 #if 0
-	/* pinconf */
-
-	if (!no_pinconf) {
-		ret = foo_gpio_register_pinconf(foo);
-		if (ret) {
-			dev_err(dev, "unable to register pinconf\n");
-			goto err_rm_gpiochip;
-		}
-
-		if (pinconf_disable_mask) {
-			ret = foo_pinconf_disable_map_create(foo,
-					pinconf_disable_mask);
-			if (ret) {
-				dev_err(dev,
-						"unable to create pinconf disable map\n");
-				goto err_rm_gpiochip;
-			}
-		}
+	/* chained gpio irq */
+	foo->gc.parent = dev;
+	ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,
+			handle_simple_irq, IRQ_TYPE_NONE);
+	if (ret) {
+		dev_err(dev, "no GPIO irqchip\n");
+		goto err_rm_gpiochip;
 	}
+
+	gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, irq,
+			foo_gpio_irq_handler);
 #endif
 
-	/* chained gpio irq */
-
-	foo->gc.parent = dev;
 
 #if 0
 	irq_base = irq_alloc_descs(-1, 0, ngpios, 0);
@@ -497,7 +460,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 	irq_domain_associate_many(foo->irq_domain, irq_base, 0, ngpios);
 
-	icg = irq_alloc_generic_chip(VIRTUAL_GPIO_DEV_NAME, 1, irq_base,
+	icg = irq_alloc_generic_chip(DRV_NAME, 1, irq_base,
 			foo->data_base_addr, handle_edge_irq);
 	if(!icg) {
 		dev_err(dev, "irq_alloc_generic_chip failed!\n");
@@ -511,7 +474,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 	ct->type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
 
-	ct->chip.name = VIRTUAL_GPIO_DEV_NAME;
+	ct->chip.name = DRV_NAME;
 	ct->chip.irq_ack = irq_gc_ack_set_bit;
 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
@@ -528,14 +491,11 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 			foo_gpio_irq_handler);
 #endif
 
-	if (request_msix_vectors(foo, 1) != 0) {
-		irq = pdev->irq;
-		printk(KERN_INFO "KVM_IVSHMEM: irq=%u\n" , irq);
+	if (request_msix_vectors(foo, NR_GPIOS) != 0) {
+		printk(KERN_INFO "MSI-X disabled\n");
 	} else {
 		printk(KERN_INFO "MSI-X enabled\n");
 	}
-
-	printk(KERN_INFO "%s successed. foo_chip=%p\n", __func__, foo);
 
 	return 0;
 
@@ -546,8 +506,8 @@ chip_release:
 desc_release:
 	irq_free_descs(icg->irq_base, ngpios);
 	pci_iounmap(pdev, foo->regs_base_addr);
-	//err_rm_gpiochip:
-	//     gpiochip_remove(gc);
+err_rm_gpiochip:
+	gpiochip_remove(gc);
 reg_release:
 	pci_iounmap(pdev, foo->data_base_addr);
 	pci_set_drvdata(pdev, NULL);
@@ -564,6 +524,7 @@ static void foo_gpio_remove(struct pci_dev *pdev)
 	struct foo_gpio *foo = pci_get_drvdata(pdev);
 
 	printk(KERN_INFO "%s foo_chip=%p\n", __func__, foo);
+
 	gpiochip_remove(&foo->gc);
 	pci_iounmap(pdev, foo->regs_base_addr);
 	pci_iounmap(pdev, foo->data_base_addr);
@@ -572,21 +533,20 @@ static void foo_gpio_remove(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 }
 
-/*--------------------------------------------------------*/
-/* Module part                                            */
-/*--------------------------------------------------------*/
 
-static const struct of_device_id foo_gpio_of_match[] = {
-	{ .compatible = "foo,foo-gpio" },
-	{ /* sentinel */ }
+/*****************************************************************
+ * 4) Module part                                         
+ *****************************************************************/
+
+static struct pci_device_id foo_gpio_id_table[] = {
+	{ 0x1af4, 0x1110, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 32 },
+	{ 0 },
 };
+MODULE_DEVICE_TABLE (pci, foo_gpio_id_table);
 
 static struct pci_driver foo_gpio_driver = {
-	.driver = {
-		.name = "foo-gpio",
-		.owner = THIS_MODULE,
-		.of_match_table = foo_gpio_of_match,
-	},
+        .name      = DRV_NAME,
+        .id_table  = foo_gpio_id_table,
 	.probe = foo_gpio_probe,
 	.remove= foo_gpio_remove,
 };
