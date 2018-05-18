@@ -167,78 +167,44 @@ static void foo_gpio_set(struct gpio_chip *gc, unsigned offset, int val)
  * 2) irq_chip part
  *****************************************************************/
 
-int foo_count = 0;
-
 static irqreturn_t foo_my_irq_handler(int irq, void * private)
 {
 	struct foo_gpio * foo = private;
 	u32 status;
 
-	foo_count++;
 	if (unlikely(foo == NULL))
 		return IRQ_NONE;
 
 	status = readl(foo->regs_base_addr + IntrStatus);
+	printk(KERN_INFO "%s status=0x%04x\n", __func__, status);
 	if (!status || (status == 0xFFFFFFFF))
 		return IRQ_NONE;
 
 	return IRQ_HANDLED;
 }
 
-static void foo_parent_gpio_irq_handler(struct irq_desc *desc)
+static void foo_gpio_irq_handler(struct irq_desc *desc)
 {
 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
 	struct irq_chip *irq_chip = irq_desc_get_chip(desc);
 	unsigned pin = 0;
 	int child_irq = 0;
 
-	foo_count++;
+	printk(KERN_INFO "%s irq=%d, hw_irq=%lu\n", 
+		__func__, desc->irq_data.irq, desc->irq_data.hwirq);
+
 	chained_irq_enter(irq_chip, desc);
 
 	child_irq = irq_find_mapping(gc->irqdomain, pin);
+
+	printk(KERN_INFO "%s child_irq=%d\n", __func__, child_irq);
 
 	generic_handle_irq(child_irq);
 
 	chained_irq_exit(irq_chip, desc);
 }
 
-static void foo_irq_ack(struct irq_data *d)
-{
-        struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-        struct foo_gpio *chip = gpiochip_get_data(gc);
-        unsigned long flags;
-
-        raw_spin_lock_irqsave(&chip->lock, flags);
-        printk(KERN_INFO "%s irq=%u, hwirq=%lu\n",
-                        __func__, d->irq, d->hwirq);
-        raw_spin_unlock_irqrestore(&chip->lock, flags);
-}
-
-static void foo_irq_mask(struct irq_data *d)
-{
-        struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-        struct foo_gpio *chip = gpiochip_get_data(gc);
-        unsigned long flags;
-
-        raw_spin_lock_irqsave(&chip->lock, flags);
-        printk(KERN_INFO "%s irq=%u, hwirq=%lu\n",
-                        __func__, d->irq, d->hwirq);
-        raw_spin_unlock_irqrestore(&chip->lock, flags);
-}
-
-static void foo_irq_unmask(struct irq_data *d)
-{
-        struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-        struct foo_gpio *chip = gpiochip_get_data(gc);
-        unsigned long flags;
-
-        raw_spin_lock_irqsave(&chip->lock, flags);
-        printk(KERN_INFO "%s irq=%u, hwirq=%lu\n",
-                        __func__, d->irq, d->hwirq);
-        raw_spin_unlock_irqrestore(&chip->lock, flags);
-}
-
-static int foo_irq_set_type(struct irq_data *d, unsigned int type)
+static int foo_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
 	struct foo_gpio *foo = gpiochip_get_data(gc);
@@ -287,18 +253,18 @@ end:
 	return 0;
 }
 
+static struct irq_chip foo_gpio_irq_chip = {
+	.name = "foo,foo-gpio-irq",
+	.irq_ack = irq_gc_ack_set_bit,
+	.irq_mask = irq_gc_mask_clr_bit,
+	.irq_unmask = irq_gc_mask_set_bit,
+	.irq_set_type = foo_gpio_irq_set_type,
+};
+
 static int foo_gpio_to_irq(struct gpio_chip *gc, unsigned pin)
 {
 	return 0;
 }
-
-static struct irq_chip foo_gpio_irq_chip = {
-	.name = "foo,foo-gpio-irq",
-	.irq_ack = foo_irq_ack,
-	.irq_mask = foo_irq_mask,
-	.irq_unmask = foo_irq_unmask,
-	.irq_set_type = foo_irq_set_type,
-};
 
 /*****************************************************************
  * 3) pci driver probe part
@@ -359,9 +325,8 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	struct irq_chip_generic *icg;
 	struct irq_chip_type *ct;
 	u32 ngpios = NR_GPIOS;
-	int parent_irq;
+	int irq = 0;
 	int ret;
-	int msix;
 	void __iomem *data;
 	void __iomem *dir;
 
@@ -463,26 +428,20 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		return ret;
 	}
 
-	parent_irq = pdev->irq;
-	printk(KERN_INFO "%s parent_irq=%d\n", __func__, parent_irq);
-
-	msix = parent_irq < 1;
-
-	if (!msix)
-	{
-		/* chained gpio irq */
-		foo->gc.parent = dev;
-
-		ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,
-				handle_simple_irq, IRQ_TYPE_NONE);
-		if (ret) {
-			dev_err(dev, "no GPIO irqchip\n");
-			goto err_rm_gpiochip;
-		}
-
-		gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, parent_irq,
-				foo_parent_gpio_irq_handler);
+#if 0
+	/* chained gpio irq */
+	foo->gc.parent = dev;
+	ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,
+			handle_simple_irq, IRQ_TYPE_NONE);
+	if (ret) {
+		dev_err(dev, "no GPIO irqchip\n");
+		goto err_rm_gpiochip;
 	}
+
+	gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, irq,
+			foo_gpio_irq_handler);
+#endif
+
 
 #if 0
 	irq_base = irq_alloc_descs(-1, 0, ngpios, 0);
@@ -532,13 +491,10 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 			foo_gpio_irq_handler);
 #endif
 
-	if (msix)
-	{
-		if (request_msix_vectors(foo, NR_GPIOS) != 0) {
-			printk(KERN_INFO "MSI-X disabled\n");
-		} else {
-			printk(KERN_INFO "MSI-X enabled\n");
-		}
+	if (request_msix_vectors(foo, NR_GPIOS) != 0) {
+		printk(KERN_INFO "MSI-X disabled\n");
+	} else {
+		printk(KERN_INFO "MSI-X enabled\n");
 	}
 
 	return 0;
@@ -567,8 +523,7 @@ static void foo_gpio_remove(struct pci_dev *pdev)
 {
 	struct foo_gpio *foo = pci_get_drvdata(pdev);
 
-	printk(KERN_INFO "%s foo_chip=%p, foo_count=%d\n", 
-		__func__, foo, foo_count);
+	printk(KERN_INFO "%s foo_chip=%p\n", __func__, foo);
 
 	gpiochip_remove(&foo->gc);
 	pci_iounmap(pdev, foo->regs_base_addr);
