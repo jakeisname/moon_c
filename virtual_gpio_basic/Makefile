@@ -18,7 +18,7 @@ CFLAGS = `pkg-config --cflags glib-2.0`
 LDLIBS = `pkg-config --libs glib-2.0`
 
 KDIR ?= /lib/modules/$$(uname -r)/build
-QEMU_DIR ?= /root/qemu-2.5
+QEMU_DIR ?= $(whoami)/qemu-2.5
 CC = $(CROSS_COMPILE)gcc
 
 vg_get_set: $(OBJS)
