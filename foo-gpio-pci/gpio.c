@@ -94,6 +94,22 @@ static inline struct foo_gpio *foo_gpiochip_get_data(struct gpio_chip *gc2)
 }
 #endif
 
+#ifdef USE_BGPIO
+static int foo_gpio_to_irq(struct gpio_chip *gc, unsigned pin)
+{
+	struct foo_gpio *foo = gpiochip_get_data(gc);
+	return irq_create_mapping(foo->irq_domain, pin);
+}
+#else
+static unsigned long foo_read32(void __iomem *reg)
+{
+    return readl(reg);
+}
+
+static void foo_write32(void __iomem *reg, unsigned long data)
+{
+    writel(data, reg);
+}
 
 static int foo_gpio_request(struct gpio_chip *gc, unsigned offset)
 {
@@ -126,7 +142,7 @@ static int foo_gpio_direction_output(struct gpio_chip *gc,
 	raw_spin_lock_irqsave(&foo->lock, flags);
 	mask = gc->read_reg(foo->data_base_addr + VIRTUAL_GPIO_OUT_EN);
 	mask2 = mask | (1 << offset);
-	gc->write_reg(foo->data_base_addr + VIRTUAL_GPIO_OUT_EN, mask);
+	gc->write_reg(foo->data_base_addr + VIRTUAL_GPIO_OUT_EN, mask2);
 	raw_spin_unlock_irqrestore(&foo->lock, flags);
 
 	printk(KERN_INFO "%s offset=%u, gpio=%u, mask2=0x%lx, init_val=%d\n",
@@ -145,7 +161,7 @@ static int foo_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
 	raw_spin_lock_irqsave(&foo->lock, flags);
 	mask = gc->read_reg(foo->data_base_addr + VIRTUAL_GPIO_OUT_EN);
 	mask2 = mask & ~(1 << offset);
-	gc->write_reg(foo->data_base_addr + VIRTUAL_GPIO_OUT_EN, mask);
+	gc->write_reg(foo->data_base_addr + VIRTUAL_GPIO_OUT_EN, mask2);
 	raw_spin_unlock_irqrestore(&foo->lock, flags);
 
 	printk(KERN_INFO "%s offset=%u, gpio=%u, mask2=0x%lx\n", 
@@ -195,6 +211,9 @@ static int foo_gpio_to_irq(struct gpio_chip *gc, unsigned pin)
 {
 	return 0;
 }
+#endif
+
+
 
 /*****************************************************************
  * 2) irq_chip part
@@ -204,8 +223,14 @@ int foo_count = 0;
 
 static int foo_irq_set_type(struct irq_data *d, unsigned int type)
 {
+#ifdef USE_BGPIO
+	struct irq_chip_generic *icg = irq_data_get_irq_chip_data(d);
+	struct foo_gpio *foo = icg->private;
+	struct gpio_chip *gc = &foo->gc;
+#else
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
 	struct foo_gpio *foo = gpiochip_get_data(gc);
+#endif
 	unsigned long flags;
 	int retval = 0;
 	u32 mask;
@@ -251,6 +276,7 @@ static int foo_irq_set_type(struct irq_data *d, unsigned int type)
 					VIRTUAL_GPIO_INT_EN, mask | d->mask);
 			break;
 
+#if 0
 		case IRQ_TYPE_EDGE_BOTH:
 			mask = gc->read_reg( foo->data_base_addr + 
 					VIRTUAL_GPIO_FALLING);
@@ -285,12 +311,17 @@ static int foo_irq_set_type(struct irq_data *d, unsigned int type)
 					VIRTUAL_GPIO_INT_EN);
 			gc->write_reg(foo->data_base_addr + 
 					VIRTUAL_GPIO_INT_EN, mask & ~d->mask);
-
+#endif
 		default:
 			retval = -EINVAL;
 			goto end;
 	}
 
+	/* enable interrupt */
+	mask = gc->read_reg(foo->data_base_addr + 
+			VIRTUAL_GPIO_INT_EN);
+	gc->write_reg(foo->data_base_addr + 
+			VIRTUAL_GPIO_INT_EN, mask | d->mask);
 end:
 	raw_spin_unlock_irqrestore(&foo->lock, flags);
 
@@ -461,16 +492,6 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 	return 0;
 }
 
-static unsigned long foo_read32(void __iomem *reg)
-{
-    return readl(reg);
-}
-
-static void foo_write32(void __iomem *reg, unsigned long data)
-{
-    writel(data, reg);
-}
-
 static int foo_gpio_probe(struct pci_dev *pdev,
 		const struct pci_device_id *pdev_id)
 {
@@ -548,26 +569,12 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 			(unsigned long) foo->regs_start,
 			(unsigned long) foo->regs_len);
 
-	gc->ngpio = ngpios;
-	gc->label = dev_name(dev);
-	gc->owner = THIS_MODULE;
-	gc->parent = dev;
-	gc->request = foo_gpio_request;
-	gc->free = foo_gpio_free;
-	gc->direction_input = foo_gpio_direction_input;
-	gc->direction_output = foo_gpio_direction_output;
-	gc->set = foo_gpio_set;
-	gc->get = foo_gpio_get;
-	gc->to_irq = foo_gpio_to_irq;
-	gc->read_reg = foo_read32;
-	gc->write_reg = foo_write32;
-
 	parent_irq = pdev->irq;
 	msix = parent_irq < 1;
 	printk(KERN_INFO "%s parent_irq=%d\n", __func__, parent_irq);
 
 	/* interrupts: set all masks */
-	gc->write_reg(foo->regs_base_addr + IntrMask, 0xffff);
+	iowrite32(0xffff, foo->regs_base_addr + IntrMask);
 
 	{
 		struct irq_desc *desc = irq_to_desc(parent_irq);
@@ -588,6 +595,12 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 				parent_irq, ret);
 	}
 
+	/* virtual_gpio_setup() */
+	gc->ngpio = ngpios;
+	gc->label = dev_name(dev);
+	gc->owner = THIS_MODULE;
+	gc->to_irq = foo_gpio_to_irq;
+
 #ifdef USE_BGPIO
 	data = foo->data_base_addr + VIRTUAL_GPIO_DATA;
 	dir = foo->data_base_addr + VIRTUAL_GPIO_OUT_EN;
@@ -597,6 +610,15 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		dev_err(dev, "Failed to register GPIOs: bgpio_init\n");
 		goto pci_release;
 	}
+#else
+	gc->request = foo_gpio_request;
+	gc->free = foo_gpio_free;
+	gc->direction_input = foo_gpio_direction_input;
+	gc->direction_output = foo_gpio_direction_output;
+	gc->set = foo_gpio_set;
+	gc->get = foo_gpio_get;
+	gc->read_reg = foo_read32;
+	gc->write_reg = foo_write32;
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0))
@@ -608,6 +630,8 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		dev_err(dev, "unable to add GPIO chip\n");
 		goto pci_release;
 	}
+
+	gc->parent = dev;
 
 #if 0
 	if (!msix)
@@ -656,11 +680,9 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 	ct = icg->chip_types;
 	icg->private = foo;
-
 	foo->icg = icg;
 
 	ct->type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
-
 	ct->chip.name = DRV_NAME;
 	ct->chip.irq_ack = irq_gc_ack_set_bit;
 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
