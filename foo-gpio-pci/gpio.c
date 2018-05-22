@@ -78,6 +78,19 @@ struct foo_gpio {
 	int nvectors;
 };
 
+static u32 foo_rw(struct gpio_chip *gc, void __iomem *addr, 
+	u32 set, u32 clear)
+{
+	u32 mask;
+
+	mask = (u32) gc->read_reg(addr);
+	mask |= set;
+	mask &= ~clear;
+	gc->write_reg( addr, mask );
+
+	return mask;
+}
+
 /*****************************************************************
  * 1) gpio_chip part
  *****************************************************************/
@@ -232,8 +245,7 @@ static int foo_irq_set_type(struct irq_data *d, unsigned int type)
 	struct foo_gpio *foo = gpiochip_get_data(gc);
 #endif
 	unsigned long flags;
-	int retval = 0;
-	u32 mask;
+	int ret = 0;
 
 	printk(KERN_INFO "%s irq=%u, hwirq=%lu, type=%u\n",
 			__func__, d->irq, d->hwirq, type);
@@ -241,91 +253,51 @@ static int foo_irq_set_type(struct irq_data *d, unsigned int type)
 
 	switch (type) {
 		case IRQ_TYPE_EDGE_RISING:
-			mask = gc->read_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_RISING);
-			gc->write_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_RISING, mask | d->mask);
-
-			mask = gc->read_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_FALLING);
-			gc->write_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_FALLING, mask & ~d->mask);
-
-			/* enable interrupt */
-			mask = gc->read_reg(foo->data_base_addr + 
-					VIRTUAL_GPIO_INT_EN);
-			gc->write_reg(foo->data_base_addr + 
-					VIRTUAL_GPIO_INT_EN, mask | d->mask);
+			/* enable rising edge irq */
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_RISING, d->mask, 0);
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_FALLING, 0, d->mask);
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_INT_EN, d->mask, 0);
 			break;
 
 		case IRQ_TYPE_EDGE_FALLING:
-			mask = gc->read_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_FALLING);
-			gc->write_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_FALLING, mask | d->mask);
-
-			mask = gc->read_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_RISING);
-			gc->write_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_RISING, mask & ~d->mask);
-
-			/* enable interrupt */
-			mask = gc->read_reg(foo->data_base_addr + 
-					VIRTUAL_GPIO_INT_EN);
-			gc->write_reg(foo->data_base_addr + 
-					VIRTUAL_GPIO_INT_EN, mask | d->mask);
+			/* enable falling edge irq */
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_RISING, 0, d->mask);
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_FALLING, d->mask, 0);
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_INT_EN, d->mask, 0);
 			break;
 
-#if 0
 		case IRQ_TYPE_EDGE_BOTH:
-			mask = gc->read_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_FALLING);
-			gc->write_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_FALLING, mask | d->mask);
-
-			mask = gc->read_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_RISING);
-			gc->write_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_RISING, mask | d->mask);
-
-			/* enable interrupt */
-			mask = gc->read_reg(foo->data_base_addr + 
-					VIRTUAL_GPIO_INT_EN);
-			gc->write_reg(foo->data_base_addr + 
-					VIRTUAL_GPIO_INT_EN, mask | d->mask);
+			/* enable rising & falling edge irq */
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_RISING, d->mask, 0);
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_FALLING, d->mask, 0);
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_INT_EN, d->mask, 0);
 			break;
 
 		case IRQ_TYPE_NONE:
-			mask = gc->read_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_FALLING);
-			gc->write_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_FALLING, mask & ~d->mask);
-
-			mask = gc->read_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_RISING);
-			gc->write_reg( foo->data_base_addr + 
-					VIRTUAL_GPIO_RISING, mask & ~d->mask);
-
-			/* disable interrupt */
-			mask = gc->read_reg(foo->data_base_addr + 
-					VIRTUAL_GPIO_INT_EN);
-			gc->write_reg(foo->data_base_addr + 
-					VIRTUAL_GPIO_INT_EN, mask & ~d->mask);
-#endif
+			/* disable irq */
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_RISING, 0, d->mask);
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_FALLING, 0, d->mask);
+			foo_rw(gc, foo->data_base_addr + 
+					VIRTUAL_GPIO_INT_EN, 0, d->mask);
+			break;
 		default:
-			retval = -EINVAL;
-			goto end;
+			ret = -EINVAL;
 	}
 
-	/* enable interrupt */
-	mask = gc->read_reg(foo->data_base_addr + 
-			VIRTUAL_GPIO_INT_EN);
-	gc->write_reg(foo->data_base_addr + 
-			VIRTUAL_GPIO_INT_EN, mask | d->mask);
-end:
 	raw_spin_unlock_irqrestore(&foo->lock, flags);
 
-	return 0;
+	return ret;
 }
 
 #ifdef USE_BGPIO
@@ -356,16 +328,13 @@ static irqreturn_t foo_parent_irq_handler(int irq, void * private)
 		/* hwirq range is 0 ~ 31 */
 		for_each_set_bit(hwirq, &pending, gc->ngpio) {
 			sub_irq = irq_find_mapping(gc->irqdomain, hwirq);
+			printk(KERN_INFO "%s sub_irq=%d, hwirq=%d\n", 
+				__func__, sub_irq, hwirq);
 			generic_handle_irq(sub_irq);
 		}
 	}
 
-	/* temporary */
-	gc->write_reg(foo->data_base_addr + VIRTUAL_GPIO_INT_EOI, 
-			0xffffffff);
-
-	printk(KERN_INFO "%s foo_count=%d, irq=%d, status=%lu\n", 
-		__func__, foo_count, irq, status);
+	printk(KERN_INFO "%s foo_count=%d\n", __func__, foo_count);
 
 	return IRQ_HANDLED;
 }
