@@ -140,6 +140,9 @@ ivshmem_client_get_peer(IvshmemClient *client, int peer_id)
 
 
     do {
+	/* Jake, added */
+        ivshmem_client_show_connected_peer(client);
+
         FD_ZERO(&fds);
         maxfd = 0;
         ivshmem_client_get_fds(client, &fds, &maxfd);

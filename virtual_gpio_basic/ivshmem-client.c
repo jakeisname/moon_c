@@ -455,3 +455,17 @@ ivshmem_client_dump(const IvshmemClient *client)
         }
     }
 }
+
+/* Jake, added */
+IvshmemClientPeer * ivshmem_client_show_connected_peer(IvshmemClient *client)
+{       
+	IvshmemClientPeer *peer;
+
+	QTAILQ_FOREACH(peer, &client->peer_list, next) {
+		if (peer->id == client->local.id)
+			printf( "local     peer=%d\n", peer->id);
+		else    
+			printf( "connected peer=%d\n", peer->id);
+	}
+	return NULL;
+}
