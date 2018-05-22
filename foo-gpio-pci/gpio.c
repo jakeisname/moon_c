@@ -22,6 +22,7 @@ MODULE_LICENSE("GPL");
 #endif
 
 // #define USE_BGPIO
+#define CASCADED_IRQ
 
 #define DRV_NAME "pci"
 #define NR_GPIOS 32
@@ -330,19 +331,24 @@ static irqreturn_t foo_parent_irq_handler(int irq, void * private)
 	return IRQ_HANDLED;
 }
 
+#ifdef CASCADED_IRQ
+static void foo_parent_irq_handler2(struct irq_desc *d)
+{
+	struct gpio_chip *gc = irq_desc_get_handler_data(d);
+        struct foo_gpio *foo = gpiochip_get_data(gc);
+	struct irq_chip *chip = irq_desc_get_chip(d);
+
+	printk(KERN_INFO "%s irq=%d, hwirq=%lu\n", 
+		__func__, d->irq_data.irq, d->irq_data.hwirq);
+
+	chained_irq_enter(chip, d);
+	foo_parent_irq_handler(d->irq_data.irq, foo);
+	chained_irq_exit(chip, d);
+}
+#endif
+
 #ifdef USE_BGPIO
 #else
-static void foo_parent_irq_handler2(struct irq_desc *desc)
-{
-	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
-        struct foo_gpio *foo = gpiochip_get_data(gc);
-	struct irq_chip *chip = irq_desc_get_chip(desc);
-
-	chained_irq_enter(chip, desc);
-	foo_parent_irq_handler(desc->irq_data.irq, foo);
-	chained_irq_exit(chip, desc);
-}
-
 static void foo_irq_ack(struct irq_data *d)
 {
         struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
@@ -552,6 +558,8 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 	/* interrupts: set all masks */
 	iowrite32(0xffff, foo->regs_base_addr + IntrMask);
+	// iowrite32(0xffffffff, foo->data_base_addr + VIRTUAL_GPIO_INT_ST);
+	// iowrite32(0xffffffff, foo->data_base_addr + VIRTUAL_GPIO_INT_EOI);
 
 	{
 		struct irq_desc *desc = irq_to_desc(parent_irq);
@@ -563,6 +571,8 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 					desc->status_use_accessors);
 	}
 
+#ifdef CASCADED_IRQ
+#else
 	if (!msix)
 	{
 		ret = devm_request_irq(dev, parent_irq,
@@ -571,6 +581,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		dev_info(dev, "request_irq() irq=%d, ret=%d\n", 
 				parent_irq, ret);
 	}
+#endif
 
 	/* virtual_gpio_setup() */
 	gc->ngpio = ngpios;
@@ -661,9 +672,23 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 #else
 	if (!msix)
 	{
+#ifdef CASCADED_IRQ
+		ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,
+				handle_simple_irq, IRQ_TYPE_NONE);
+		dev_info(dev, "gpiochip_irqchip_add() ret=%d\n", ret);
+
+		if (ret) {
+			dev_err(dev, "no GPIO irqchip\n");
+			goto pci_release;
+		}
+
+		gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, 
+			parent_irq, foo_parent_irq_handler2);
+#else
 		ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,
 				handle_edge_irq, IRQ_TYPE_NONE);
 		dev_info(dev, "gpiochip_irqchip_add() ret=%d\n", ret);
+
 		if (ret) {
 			dev_err(dev, "no GPIO irqchip\n");
 			goto pci_release;
@@ -671,6 +696,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 		gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, 
 			parent_irq, NULL);
+#endif
 	}
 #endif
 
