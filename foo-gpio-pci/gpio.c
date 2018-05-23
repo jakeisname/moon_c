@@ -23,21 +23,38 @@ MODULE_LICENSE("GPL");
 
 /* 
  * generic chip handler
- *	1) generic gpio_chip & irq_chip handler
- *      2) implement gpio_chip & irq_chip handler
- *
-// #define USE_BGPIO
+ *	1) USE_BGPIO:	
+ *		- use prepared  generic gpio_chip & irq_chip handler
+ *      2) <undefine>:	
+ *		- implement gpio_chip & irq_chip handler
+ */
+#define USE_BGPIO
 
 /*
  * cascaded irq:
- *	- 1) chained irq
- *	- 2) nested irq
+ *	1) CHAINED_IRQ:	
+ *		- chained irq 
+ *		- commonly internal gpio in SoC
+ *	2) <undefine>:	
+ *		- nested irq 
+ *		- commonly external gpio from SoC (via i2c, pci, ...)
+ *		- threaded irq (can be sleep api in interrupt handler)
  */
 #define CHAINED_IRQ
 
 #define DRV_NAME "foo_gpio"
 #define NR_GPIOS 32
 
+/* pci bar0 for ivshmem */
+enum {
+	/* KVM Inter-VM shared memory device register offsets */
+	IntrMask        = 0x00,    /* Interrupt Mask */
+	IntrStatus      = 0x04,    /* Interrupt Status */
+	IVPosition      = 0x08,    /* VM ID */
+	Doorbell        = 0x0c,    /* Doorbell */
+};
+
+/* bar2 for ivshmem (used by legacy irq) */
 #define VIRTUAL_GPIO_DATA       0x00
 #define VIRTUAL_GPIO_OUT_EN     0x04
 #define VIRTUAL_GPIO_INT_EN     0x08
@@ -49,14 +66,6 @@ MODULE_LICENSE("GPL");
 #ifndef BITS_TO_BYTES
 #define BITS_TO_BYTES(nr)       DIV_ROUND_UP(nr, BITS_PER_BYTE)
 #endif
-
-enum {
-	/* KVM Inter-VM shared memory device register offsets */
-	IntrMask        = 0x00,    /* Interrupt Mask */
-	IntrStatus      = 0x04,    /* Interrupt Status */
-	IVPosition      = 0x08,    /* VM ID */
-	Doorbell        = 0x0c,    /* Doorbell */
-};
 
 struct foo_gpio {
 	struct device *dev;
@@ -328,7 +337,12 @@ static irqreturn_t foo_common_irq_handler(int irq, void * private)
 			sub_irq = irq_find_mapping(gc->irqdomain, hwirq);
 			printk(KERN_INFO "%s sub_irq=%d, hwirq=%d\n", 
 				__func__, sub_irq, hwirq);
+
+#ifdef CHAINED_IRQ
 			generic_handle_irq(sub_irq);
+#else
+			handle_nested_irq(sub_irq);
+#endif
 
 			/* eoi */
 			foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_INT_EOI, 
@@ -366,9 +380,7 @@ static irqreturn_t foo_nested_irq_handler(int irq, void * private)
 	irqreturn_t r;
 	printk(KERN_INFO "%s irq=%d\n", __func__, irq);
 
-	chained_irq_enter(chip, d);
 	r = foo_common_irq_handler(irq, private);
-	chained_irq_exit(chip, d);
 
 	return r;
 }
@@ -458,6 +470,10 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 {
 	int i, err;
 	const char *name = DRV_NAME;
+#ifdef CHAINED_IRQ
+#else
+	struct device *dev = foo->dev;
+#endif
 
 	foo->nvectors = nvectors;
 
@@ -485,9 +501,14 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 		snprintf(foo->msix_names[i], sizeof *foo->msix_names,
 				"%s-config", name);
 
-		err = request_irq(foo->msix_entries[i].vector,
-				foo_chained_irq_handler, 0,
+#ifdef CHAINED_IRQ
+#else
+		err = devm_request_threaded_irq(dev, 
+				foo->msix_entries[i].vector,
+				NULL, foo_nested_irq_handler, 
+				IRQF_SHARED | IRQF_ONESHOT,
 				foo->msix_names[i], foo);
+#endif
 
 		if (err) {
 			printk(KERN_INFO "couldn't allocate irq for msi-x " \
@@ -510,6 +531,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	int parent_irq;
 	int ret;
 	int msix;
+	struct irq_desc *desc;
 #ifdef USE_BGPIO
 	int irq_base;
 	void __iomem *data;
@@ -584,25 +606,24 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	printk(KERN_INFO "%s parent_irq=%d\n", __func__, parent_irq);
 
 	/* interrupts: set all masks */
-	iowrite32(0xffff, foo->regs_base_addr + IntrMask);
+	iowrite32(0xffffffff, foo->regs_base_addr + IntrMask);
 
-	{
-		struct irq_desc *desc = irq_to_desc(parent_irq);
-		if (desc)
-			dev_info(dev, "desc=%p, irq=%d, hwirq=%lu, "
-					"status_use_accessors=0x%x\n", 
-					desc, desc->irq_data.irq, 
-					desc->irq_data.hwirq,
-					desc->status_use_accessors);
-	}
+	desc = irq_to_desc(parent_irq);
+	if (desc)
+		dev_info(dev, "desc=%p, irq=%d, hwirq=%lu, "
+				"status_use_accessors=0x%x\n", 
+				desc, desc->irq_data.irq, 
+				desc->irq_data.hwirq,
+				desc->status_use_accessors);
 
 #ifdef CHAINED_IRQ
 #else
 	if (!msix)
 	{
-		ret = devm_threaded_request_irq(dev, parent_irq,
-				foo_nested_irq_handler, 
-				IRQF_SHARED, DRV_NAME, foo);
+		ret = devm_request_threaded_irq(dev, parent_irq,
+				NULL, foo_nested_irq_handler, 
+				IRQF_SHARED | IRQF_ONESHOT, 
+				DRV_NAME, foo);
 		dev_info(dev, "request_irq() irq=%d, ret=%d\n", 
 				parent_irq, ret);
 	}
@@ -691,26 +712,18 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	devm_irq_setup_generic_chip(dev, icg, 
 		IRQ_MSK(NR_GPIOS), 0, 0, 0);
 
-	/* not handler coz irq is nested (irq is not cascaded) */
-	gpiochip_set_nested_irqchip(gc, &ct->chip, parent_irq, NULL);
+#ifdef CHAINED_IRQ
+	gpiochip_set_chained_irqchip(gc, &foo->icg->chip_types[0].chip, 
+			parent_irq, foo_chained_irq_handler);
+#else
+	gpiochip_set_nested_irqchip(gc, &ct->chip, parent_irq);
+#endif
 
 #else
 	if (!msix)
 	{
 #ifdef CHAINED_IRQ
 		ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,
-				handle_simple_irq, IRQ_TYPE_NONE);
-		dev_info(dev, "gpiochip_irqchip_add() ret=%d\n", ret);
-
-		if (ret) {
-			dev_err(dev, "no GPIO irqchip\n");
-			goto pci_release;
-		}
-
-		gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, 
-			parent_irq, foo_chained_irq_handler);
-#else
-		ret = gpiochip_irqchip_add_nested(gc, &foo_gpio_irq_chip, 0,
 				handle_edge_irq, IRQ_TYPE_NONE);
 		dev_info(dev, "gpiochip_irqchip_add() ret=%d\n", ret);
 
@@ -719,8 +732,19 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 			goto pci_release;
 		}
 
-		gpiochip_set_nested_irqchip(gc, &foo_gpio_irq_chip, 
-			parent_irq);
+		gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, 
+				parent_irq, foo_chained_irq_handler);
+#else
+		ret = gpiochip_irqchip_add_nested(gc, &foo_gpio_irq_chip, 0,
+				handle_simple_irq, IRQ_TYPE_NONE);
+		dev_info(dev, "gpiochip_irqchip_add() ret=%d\n", ret);
+
+		if (ret) {
+			dev_err(dev, "no GPIO irqchip\n");
+			goto pci_release;
+		}
+
+		gpiochip_set_nested_irqchip(gc, &ct->chip, parent_irq);
 #endif
 	}
 #endif
