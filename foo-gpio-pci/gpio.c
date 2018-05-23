@@ -21,10 +21,21 @@ MODULE_LICENSE("GPL");
 #define DEBUG
 #endif
 
+/* 
+ * generic chip handler
+ *	1) generic gpio_chip & irq_chip handler
+ *      2) implement gpio_chip & irq_chip handler
+ *
 // #define USE_BGPIO
-#define CASCADED_IRQ
 
-#define DRV_NAME "pci"
+/*
+ * cascaded irq:
+ *	- 1) chained irq
+ *	- 2) nested irq
+ */
+#define CHAINED_IRQ
+
+#define DRV_NAME "foo_gpio"
 #define NR_GPIOS 32
 
 #define VIRTUAL_GPIO_DATA       0x00
@@ -69,6 +80,7 @@ struct foo_gpio {
 	unsigned int irq;
 #endif
 
+	/* msix related */
 	char (*msix_names)[256];
 	struct msix_entry *msix_entries;
 	int nvectors;
@@ -83,10 +95,6 @@ static u32 foo_rw(struct gpio_chip *gc, void __iomem *addr,
 	mask2 = mask | set;
 	mask2 &= ~clear;
 	gc->write_reg( addr, mask2 );
-#if 0
-	printk(KERN_INFO "%s mask=0x%x, set=0x%x, clear=0x%x, write=0x%x\n", 
-		__func__, mask, set, clear, mask2);
-#endif
 
 	return mask2;
 }
@@ -291,7 +299,7 @@ static int foo_irq_set_type(struct irq_data *d, unsigned int type)
 	return ret;
 }
 
-static irqreturn_t foo_parent_irq_handler(int irq, void * private)
+static irqreturn_t foo_common_irq_handler(int irq, void * private)
 {
 	struct foo_gpio * foo = private;
 	struct gpio_chip *gc = &foo->gc;
@@ -331,8 +339,12 @@ static irqreturn_t foo_parent_irq_handler(int irq, void * private)
 	return IRQ_HANDLED;
 }
 
-#ifdef CASCADED_IRQ
-static void foo_parent_irq_handler2(struct irq_desc *d)
+
+#ifdef CHAINED_IRQ
+/* 
+ * impossible to use sleep api 
+*/
+static void foo_chained_irq_handler(struct irq_desc *d)
 {
 	struct gpio_chip *gc = irq_desc_get_handler_data(d);
         struct foo_gpio *foo = gpiochip_get_data(gc);
@@ -342,8 +354,23 @@ static void foo_parent_irq_handler2(struct irq_desc *d)
 		__func__, d->irq_data.irq, d->irq_data.hwirq);
 
 	chained_irq_enter(chip, d);
-	foo_parent_irq_handler(d->irq_data.irq, foo);
+	foo_common_irq_handler(d->irq_data.irq, foo);
 	chained_irq_exit(chip, d);
+}
+#else
+/* 
+ * possible to use sleep api
+ */
+static irqreturn_t foo_nested_irq_handler(int irq, void * private)
+{
+	irqreturn_t r;
+	printk(KERN_INFO "%s irq=%d\n", __func__, irq);
+
+	chained_irq_enter(chip, d);
+	r = foo_common_irq_handler(irq, private);
+	chained_irq_exit(chip, d);
+
+	return r;
 }
 #endif
 
@@ -459,7 +486,7 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 				"%s-config", name);
 
 		err = request_irq(foo->msix_entries[i].vector,
-				foo_parent_irq_handler, 0,
+				foo_chained_irq_handler, 0,
 				foo->msix_names[i], foo);
 
 		if (err) {
@@ -558,8 +585,6 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 	/* interrupts: set all masks */
 	iowrite32(0xffff, foo->regs_base_addr + IntrMask);
-	// iowrite32(0xffffffff, foo->data_base_addr + VIRTUAL_GPIO_INT_ST);
-	// iowrite32(0xffffffff, foo->data_base_addr + VIRTUAL_GPIO_INT_EOI);
 
 	{
 		struct irq_desc *desc = irq_to_desc(parent_irq);
@@ -571,12 +596,12 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 					desc->status_use_accessors);
 	}
 
-#ifdef CASCADED_IRQ
+#ifdef CHAINED_IRQ
 #else
 	if (!msix)
 	{
-		ret = devm_request_irq(dev, parent_irq,
-				foo_parent_irq_handler, 
+		ret = devm_threaded_request_irq(dev, parent_irq,
+				foo_nested_irq_handler, 
 				IRQF_SHARED, DRV_NAME, foo);
 		dev_info(dev, "request_irq() irq=%d, ret=%d\n", 
 				parent_irq, ret);
@@ -667,12 +692,12 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		IRQ_MSK(NR_GPIOS), 0, 0, 0);
 
 	/* not handler coz irq is nested (irq is not cascaded) */
-	gpiochip_set_chained_irqchip(gc, &ct->chip, parent_irq, NULL);
+	gpiochip_set_nested_irqchip(gc, &ct->chip, parent_irq, NULL);
 
 #else
 	if (!msix)
 	{
-#ifdef CASCADED_IRQ
+#ifdef CHAINED_IRQ
 		ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,
 				handle_simple_irq, IRQ_TYPE_NONE);
 		dev_info(dev, "gpiochip_irqchip_add() ret=%d\n", ret);
@@ -683,9 +708,9 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		}
 
 		gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, 
-			parent_irq, foo_parent_irq_handler2);
+			parent_irq, foo_chained_irq_handler);
 #else
-		ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,
+		ret = gpiochip_irqchip_add_nested(gc, &foo_gpio_irq_chip, 0,
 				handle_edge_irq, IRQ_TYPE_NONE);
 		dev_info(dev, "gpiochip_irqchip_add() ret=%d\n", ret);
 
@@ -694,8 +719,8 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 			goto pci_release;
 		}
 
-		gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, 
-			parent_irq, NULL);
+		gpiochip_set_nested_irqchip(gc, &foo_gpio_irq_chip, 
+			parent_irq);
 #endif
 	}
 #endif
