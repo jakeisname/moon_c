@@ -332,6 +332,18 @@ static irqreturn_t foo_common_irq_handler(int irq, void * private)
 	return IRQ_HANDLED;
 }
 
+/*                                                                              
+ * possible to use sleep api                                                    
+ */                                                                             
+static irqreturn_t foo_nested_irq_handler(int irq, void * private)              
+{                                                                               
+        irqreturn_t r;                                                          
+        printk(KERN_INFO "%s irq=%d\n", __func__, irq);                         
+                                                                                
+        r = foo_common_irq_handler(irq, private);                               
+                                                                                
+        return r;                                                               
+}    
 
 /* 
  * impossible to use sleep api 
@@ -488,6 +500,29 @@ static const struct irq_domain_ops foo_irqd_ops = {
  * 4) pci driver probe part
  *****************************************************************/
 
+static int request_msix_vectors(struct foo_gpio *foo)
+{
+	struct pci_dev *pdev = foo->pdev;
+	struct device *dev = foo->dev;
+	int nvec;
+	int ret;
+
+	nvec = pci_alloc_irq_vectors(pdev, 1, 1, PCI_IRQ_MSIX);
+	dev_info(dev, "pci_alloc_irq_vectors nvec=%d\n", nvec);
+	if (nvec < 0) {
+		dev_err(dev, "pci_alloc_irq_vectors failed. nvec=%d\n", nvec);
+		return -ENOSPC;
+	}
+
+	ret = devm_request_threaded_irq(dev, pdev->irq,                
+			NULL, foo_nested_irq_handler,                   
+			IRQF_SHARED | IRQF_ONESHOT,                     
+			DRV_NAME, foo);                                 
+	dev_info(dev, "request_irq() irq=%d, ret=%d\n",                 
+			pdev->irq, ret); 
+
+	return 0;
+}
 
 static int request_msix_entries(struct foo_gpio *foo, int nvec)
 {
@@ -518,7 +553,7 @@ static int request_msix_entries(struct foo_gpio *foo, int nvec)
                 foo->line_entries[i].fil_bits = 0;
         }
 
-        ret = pci_enable_msix_range(pdev, foo->msix_entries, nvec, nvec);
+        ret = pci_enable_msix_range(pdev, foo->msix_entries, 1, nvec);
         if (ret < 0)
 	{
 		dev_err(dev, "pci_enable_msix_range failed. ret=%d\n", ret);
@@ -529,23 +564,6 @@ static int request_msix_entries(struct foo_gpio *foo, int nvec)
 
 out:
 	return ret;
-}
-
-
-
-static int request_msix_vectors(struct foo_gpio *foo, int nvec)
-{
-	struct pci_dev *pdev = foo->pdev;
-	struct device *dev = foo->dev;
-
-	nvec = pci_alloc_irq_vectors(pdev, 1, nvec, PCI_IRQ_MSIX);
-	dev_info(dev, "pci_alloc_irq_vectors nvec=%d\n", nvec);
-	if (nvec < 0) {
-		dev_err(dev, "pci_alloc_irq_vectors failed. nvec=%d\n", nvec);
-		return -ENOSPC;
-	}
-
-	return 0;
 }
 
 static int foo_gpio_probe(struct pci_dev *pdev,
@@ -634,16 +652,15 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 				desc, desc->irq_data.irq, 
 				desc->irq_data.hwirq,
 				desc->status_use_accessors);
-
 #if 0
-	ret = request_msix_entries(foo, 1);
-	if (ret < 0)
-		goto pci_release;
-#else
-	ret = request_msix_vectors(foo, 1);
+	ret = request_msix_vectors(foo);
 	if (ret < 0)
 		goto pci_release;
 #endif
+	ret = request_msix_entries(foo, ngpios);
+	if (ret < 0)
+		goto pci_release;
+
 	gc->ngpio = ngpios;
 	gc->label = dev_name(dev);
 	gc->owner = THIS_MODULE;
@@ -665,8 +682,9 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		goto pci_release;
 	}
 
+#if 1
 	ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,           
-			handle_edge_irq, IRQ_TYPE_NONE);                
+			handle_simple_irq, IRQ_TYPE_NONE);                
 	dev_info(dev, "gpiochip_irqchip_add() ret=%d\n", ret);          
 
 	if (ret) {                                                      
@@ -676,6 +694,19 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 	gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip,            
 			parent_irq, foo_chained_irq_handler);  
+#else
+	ret = gpiochip_irqchip_add_nested(gc, &foo_gpio_irq_chip, 0,    
+			handle_simple_irq, IRQ_TYPE_NONE);              
+	dev_info(dev, "gpiochip_irqchip_add_nested() ret=%d\n", ret);   
+
+	if (ret) {                                                      
+		dev_err(dev, "no GPIO irqchip\n");                      
+		goto pci_release;                                       
+	}                                                               
+
+	gpiochip_set_nested_irqchip(gc, &foo_gpio_irq_chip,             
+			parent_irq);  
+#endif
 
 	pci_set_drvdata(pdev, foo);
 
