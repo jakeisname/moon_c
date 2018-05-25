@@ -173,7 +173,7 @@ static int foo_gpio_direction_output(struct gpio_chip *gc,
 	unsigned long flags;
 	u32 mask = 1 << offset;
 
-	gc->set(gc, gpio, val);	/* set value */
+	gc->set(gc, offset, val);	/* set value */
 
 	raw_spin_lock_irqsave(&foo->lock, flags);
 	foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_OUT_EN, mask, 0);
