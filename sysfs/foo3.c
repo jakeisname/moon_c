@@ -7,7 +7,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>                                              
-                                                                                
+
 struct foo_attr{
 	struct device_attribute attr;
 	int value;
@@ -22,28 +22,17 @@ static struct attribute *foo_attrs[] = {
 	NULL
 };
 
-#if 1
 ATTRIBUTE_GROUPS(foo);
-#else
-static const struct attribute_group foo_group = {
-	.attrs = foo_attrs,
-};
-
-static const struct attribute_group foo_groups[] = {
-	&foo_group,
-	NULL
-};
-#endif
 
 static ssize_t foo_show(struct device *dev, struct device_attribute *attr, 
-	char *buf)
+		char *buf)
 {
 	struct foo_attr *foo = container_of(attr, struct foo_attr, attr);
 	return scnprintf(buf, PAGE_SIZE, "%d\n", foo->value);
 }
 
 static ssize_t foo_store(struct device *dev, struct device_attribute *attr, 
-	const char *buf, size_t len)
+		const char *buf, size_t len)
 {
 	struct foo_attr *foo = container_of(attr, struct foo_attr, attr);
 
@@ -63,21 +52,21 @@ static struct foo_attr foo_notify = {
 };
 
 static struct platform_device foo_device = {                                   
-    .name = "foo",
-    .id = -1,
+	.name = "foo",
+	.id = -1,
 	.dev.groups = foo_groups,
 };                                                                              
-                                                                                
+
 static int __init foo_init(void)
 {
 	int ret = 0;
 
 	printk("%s\n", __func__);
 
-    ret = platform_device_register(&foo_device);
+	ret = platform_device_register(&foo_device);
 	if (ret < 0) {
 		printk("%s: platform_device_register() failed. ret=%d\n",
-			__func__, ret);
+				__func__, ret);
 		ret = -1;
 	}
 
@@ -86,7 +75,7 @@ static int __init foo_init(void)
 
 static void __exit foo_exit(void)
 {
-    platform_device_unregister(&foo_device);
+	platform_device_unregister(&foo_device);
 
 	printk("%s\n", __func__);
 }

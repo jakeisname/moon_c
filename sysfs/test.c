@@ -8,21 +8,24 @@
 #include <sys/stat.h> 
 #include <poll.h>
 
+#define FOO_VALUE "/sys/foo/foo_value"
+#define FOO_NOTIFY "/sys/foo/foo_notify"
+
 int main(int argc, char **argv)
 {
 	int len, value_fd, notify_fd, recv;
 	char attr_data[100];
-	struct pollfd fds[2];
+	struct pollfd fds[1];
 
 	if ((value_fd = open("/sys/foo/foo_value", O_RDWR)) < 0)
 	{
-		perror("Unable to open /sys/foo/foo_value");
+		printf("Unable to open %s\n", FOO_VALUE);
 		exit(1);
 	}
 
 	if ((notify_fd = open("/sys/foo/foo_notify", O_RDWR)) < 0)
 	{
-		perror("Unable to open /sys/foo/foo_notify");
+		printf("Unable to open %s\n", FOO_NOTIFY);
 		exit(1);
 	}
 

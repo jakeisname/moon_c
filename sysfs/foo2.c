@@ -28,14 +28,14 @@ static struct attribute_group foo_group = {
 };
 
 static ssize_t foo_show(struct kobject *kobj, struct kobj_attribute *attr, 
-	char *buf)
+		char *buf)
 {
 	struct foo_attr *foo = container_of(attr, struct foo_attr, attr);
 	return scnprintf(buf, PAGE_SIZE, "%d\n", foo->value);
 }
 
 static ssize_t foo_store(struct kobject *kobj, struct kobj_attribute *attr, 
-	const char *buf, size_t len)
+		const char *buf, size_t len)
 {
 	struct foo_attr *foo = container_of(attr, struct foo_attr, attr);
 

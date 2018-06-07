@@ -15,14 +15,14 @@ struct foo_attr{
 };
 
 static struct foo_attr foo_value = {
-    .attr.name="foo_value",
-    .attr.mode = 0644,
+	.attr.name="foo_value",
+	.attr.mode = 0644,
 	.value = 0,
 };
 
 static struct foo_attr foo_notify = {
-    .attr.name="foo_notify",
-    .attr.mode = 0644,
+	.attr.name="foo_notify",
+	.attr.mode = 0644,
 	.value = 0,
 };
 
@@ -64,14 +64,14 @@ static int __init foo_init(void)
 
 	printk("%s\n", __func__);
 
-    foo_kobj = kzalloc(sizeof(*foo_kobj), GFP_KERNEL);
+	foo_kobj = kzalloc(sizeof(*foo_kobj), GFP_KERNEL);
 	if (!foo_kobj)
 	{
 		printk("%s: kzalloc() failed\n", __func__);
 		return -1;
 	}
 
-    kobject_init(foo_kobj, &foo_type);
+	kobject_init(foo_kobj, &foo_type);
 	ret = kobject_add(foo_kobj, NULL, "%s", "foo");
 	if (ret) {
 		printk("kobject_add() failed. ret=%d\n", ret);
