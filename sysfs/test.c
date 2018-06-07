@@ -17,13 +17,13 @@ int main(int argc, char **argv)
 	char attr_data[100];
 	struct pollfd fds[1];
 
-	if ((value_fd = open("/sys/foo/foo_value", O_RDWR)) < 0)
+	if ((value_fd = open(FOO_VALUE, O_RDWR)) < 0)
 	{
 		printf("Unable to open %s\n", FOO_VALUE);
 		exit(1);
 	}
 
-	if ((notify_fd = open("/sys/foo/foo_notify", O_RDWR)) < 0)
+	if ((notify_fd = open(FOO_NOTIFY, O_RDWR)) < 0)
 	{
 		printf("Unable to open %s\n", FOO_NOTIFY);
 		exit(1);

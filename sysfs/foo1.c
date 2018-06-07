@@ -62,8 +62,6 @@ static int __init foo_init(void)
 {
 	int ret = 0;
 
-	printk("%s\n", __func__);
-
 	foo_kobj = kzalloc(sizeof(*foo_kobj), GFP_KERNEL);
 	if (!foo_kobj)
 	{
