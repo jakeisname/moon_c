@@ -45,10 +45,10 @@ static void foo_device_release(struct device *dev)
 
 
 extern struct device *foo0_dev;
-extern struct class *foo0_class;
-extern struct bus_type *foo0_bus;
+extern struct class foo_class;
+extern struct bus_type foo_bus;
 
-static struct platform_device foo_device = {                                   
+struct platform_device foo_device = {                                   
 	.name = "foo",
 	.id = -1,
 	.dev = { 
@@ -58,6 +58,7 @@ static struct platform_device foo_device = {
 	.num_resources = ARRAY_SIZE(foo_resource),
 	.resource = foo_resource,
 };                                                                              
+EXPORT_SYMBOL(foo_device);
 
 static int __init foo1_init(void)
 {
