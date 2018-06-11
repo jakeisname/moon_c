@@ -39,15 +39,18 @@ static struct resource foo_resource[] = {
 		DEFINE_RES_IRQ_NAMED(100, "foo_irq")
 };
 
+extern struct device *foo2_dev;
+extern struct class *foo2_class;
+extern struct bus_type *foo2_bus;
+
 static struct platform_device foo_device = {                                   
 	.name = "foo",
 	.id = -1,
+	//.dev.class = foo2_class,
 	.dev.groups = foo_groups,
-//	.num_resources = ARRAY_SIZE(foo_resource),
-//	.resource = foo_resource,
+	.num_resources = ARRAY_SIZE(foo_resource),
+	.resource = foo_resource,
 };                                                                              
-
-extern struct device *foo_parent_dev;
 
 static int __init foo1_init(void)
 {
@@ -62,7 +65,7 @@ static int __init foo1_init(void)
 		ret = -1;
 	}
 
-	foo_parent_dev = &foo_device.dev;
+	foo2_dev = &foo_device.dev;
 
 	return ret;	/* 0=success */
 }

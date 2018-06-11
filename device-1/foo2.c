@@ -10,6 +10,8 @@
 #include <linux/platform_device.h>                                              
 
 static struct class foo_class;
+static struct bus_type foo_bus;
+
 static const struct attribute_group *foo_class_groups[];
 
 int export = -1;
@@ -17,10 +19,14 @@ int bus_bus = 0;
 int bus_dev = 0;
 int bus_drv = 0;
 static struct device *new_dev = NULL;
-struct device *foo_parent_dev = NULL;
+struct device *foo2_dev = NULL;
+struct class *foo2_class = &foo_class;
+struct bus_type *foo2_bus = &foo_bus;
 
 /* for foo1.ko */
-EXPORT_SYMBOL(foo_parent_dev);
+EXPORT_SYMBOL(foo2_dev);
+EXPORT_SYMBOL(foo2_class);
+EXPORT_SYMBOL(foo2_bus);
 
 
 /**************************************************************************
@@ -37,7 +43,7 @@ static ssize_t export_show(struct class *class, struct class_attribute *attr,
 static ssize_t export_store(struct class *class, struct class_attribute *attr,
 		const char *buf, size_t len)
 {
-	struct device *dev = foo_parent_dev;
+	struct device *dev = foo2_dev;
 
 	if (export != -1) {
 		printk(KERN_ERR "class device is created already");
