@@ -34,20 +34,27 @@ static struct attribute *foo_attrs[] = {
 ATTRIBUTE_GROUPS(foo);
 
 static struct resource foo_resource[] = {
-		DEFINE_RES_IO_NAMED(0x80000000, 0x100, "foo_io"),
-		DEFINE_RES_MEM_NAMED(0x90000000, 0x100, "foo_mem"),
-		DEFINE_RES_IRQ_NAMED(100, "foo_irq")
+		DEFINE_RES_MEM_NAMED(0x400000000, 0x100, "foo_mem"),
+		DEFINE_RES_IO_NAMED(0xe000, 0x100, "foo_io"),
+		DEFINE_RES_IRQ_NAMED(10, "foo_irq"),
 };
 
-extern struct device *foo2_dev;
-extern struct class *foo2_class;
-extern struct bus_type *foo2_bus;
+static void foo_device_release(struct device *dev)
+{
+}
+
+
+extern struct device *foo0_dev;
+extern struct class *foo0_class;
+extern struct bus_type *foo0_bus;
 
 static struct platform_device foo_device = {                                   
 	.name = "foo",
 	.id = -1,
-	//.dev.class = foo2_class,
-	.dev.groups = foo_groups,
+	.dev = { 
+		.groups = foo_groups,
+		.release = foo_device_release,
+	},
 	.num_resources = ARRAY_SIZE(foo_resource),
 	.resource = foo_resource,
 };                                                                              
@@ -65,7 +72,7 @@ static int __init foo1_init(void)
 		ret = -1;
 	}
 
-	foo2_dev = &foo_device.dev;
+	foo0_dev = &foo_device.dev;
 
 	return ret;	/* 0=success */
 }

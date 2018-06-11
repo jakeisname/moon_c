@@ -8,225 +8,160 @@
 #include <linux/slab.h>
 #include <linux/version.h>      /* LINUX_VERSION_CODE & KERNEL_VERSION() */
 #include <linux/platform_device.h>                                              
+#include <linux/interrupt.h>                                              
+#include <linux/irqnr.h>                                              
 
-static struct class foo_class;
-static struct bus_type foo_bus;
-
-static const struct attribute_group *foo_class_groups[];
-
-int export = -1;
-int bus_bus = 0;
-int bus_dev = 0;
-int bus_drv = 0;
-static struct device *new_dev = NULL;
-struct device *foo2_dev = NULL;
-struct class *foo2_class = &foo_class;
-struct bus_type *foo2_bus = &foo_bus;
-
-/* for foo1.ko */
-EXPORT_SYMBOL(foo2_dev);
-EXPORT_SYMBOL(foo2_class);
-EXPORT_SYMBOL(foo2_bus);
-
+static int drv1 = 0;
 
 /**************************************************************************
- * class
+ * driver 
  **************************************************************************/
 
-static ssize_t export_show(struct class *class, struct class_attribute *attr, 
-		char *buf)
+static ssize_t drv1_show(struct device_driver *driver, char *buf)
 {
-
-	return scnprintf(buf, PAGE_SIZE, "%d\n", export);
+	return scnprintf(buf, PAGE_SIZE, "%d\n", drv1);
 }
 
-static ssize_t export_store(struct class *class, struct class_attribute *attr,
+static ssize_t drv1_store(struct device_driver *driver,
 		const char *buf, size_t len)
 {
-	struct device *dev = foo2_dev;
+	sscanf(buf, "%d", &drv1);
 
-	if (export != -1) {
-		printk(KERN_ERR "class device is created already");
-		return sizeof(int);
-	}
-		
-	sscanf(buf, "%d", &export);
-
-	new_dev = device_create_with_groups(&foo_class, dev,
-			MKDEV(0, 0), NULL, NULL,
-			"foo%d", export);
-
-	// sysfs_notify(&dev->kobj, NULL, "c1");
-	return sizeof(int);
-}
-
-static ssize_t unexport_show(struct class *class, struct class_attribute *attr, 
-		char *buf)
-{
-
-	return scnprintf(buf, PAGE_SIZE, "%d\n", export);
-}
-
-static ssize_t unexport_store(struct class *class, struct class_attribute *attr,
-		const char *buf, size_t len)
-{
-	if (export == -1) {
-		printk(KERN_ERR "class device was not created");
-		return sizeof(int);
-	}
-	
-	export = -1;
-
-	// device_destroy(class, 0);
-	put_device(new_dev);
-	device_unregister(new_dev);
-
-	// sysfs_notify(&dev->kobj, NULL, "c1");
+	// sysfs_notify(&dev->kobj, NULL, "drv1");
 	return sizeof(int);
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,13,0))
-static CLASS_ATTR_RW(export);
-static CLASS_ATTR_RW(unexport);
+static DRIVER_ATTR_RW(drv1);
 
-static struct attribute *foo_class_attrs[] = {
-	&class_attr_export.attr,
-	&class_attr_unexport.attr,
+static struct attribute *foo_driver_attrs[] = {
+	&driver_attr_drv1.attr,
 	NULL
 };
 
-ATTRIBUTE_GROUPS(foo_class);
+ATTRIBUTE_GROUPS(foo_driver);
 #else 
-static struct class_attribute foo_class_attrs[] = {
-	__ATTR_RW(export),
-	__ATTR_RW(unexport),
+static struct driver_attribute foo_driver_attrs[] = {
+	__ATTR_RW(drv1),
 	__ATTR_NULL,
 };
 #endif
 
-static void foo_classdev_release(struct device *dev)
+static irqreturn_t foo_irq_handler(int irq, void *irq_data)
 {
-	printk("%s\n", __func__);
+	printk("%s irq=%d\n", __func__, irq);
+
+	return IRQ_HANDLED;
 }
 
 
+static int get_and_map_resource(struct platform_device *pdev)
+{
+	int irq;
+	int ret;
+	struct irq_desc *desc;
+	struct resource *res;
 
-static struct class foo_class = {                                   
-	.name = "foo_class",
-	.owner = THIS_MODULE,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,13,0))
-	.class_groups = foo_class_groups,
-#else
-	.class_attrs = foo_class_attrs,
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0) {
+		printk(KERN_ERR "%s: platform_get_irq() failed. ret=%d\n", 
+				__func__, irq);
+
+		return irq;
+	}
+
+	dev_info(&pdev->dev, "resource-irq=%d\n", irq);
+
+	ret = devm_request_threaded_irq(&pdev->dev, irq,
+			NULL, foo_irq_handler,
+			IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+			"foo-irq", pdev);
+	if (ret != 0) {
+		for_each_irq_desc(irq, desc) {
+			printk("irq=%d, desc=%p\n", irq, desc);
+		}
+
+		printk(KERN_ERR "%s: devm_request_threaded_irq() failed. ret=%d\n", 
+				__func__, ret);
+		return ret;
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "Missing resource #%d\n", 0);
+		return -ENOENT;
+	}
+
+	dev_info(&pdev->dev, "resource-mem=0x%lx-0x%lx\n",
+			(unsigned long)res->start,
+			(unsigned long)res->end);
+#if 0
+	if (!devm_request_region(&pdev->dev, res->start,
+				resource_size(res), "foo-mem")) {
+		dev_err(&pdev->dev,
+				"Failed to request region 0x%lx-0x%lx\n",
+				(unsigned long)res->start,
+				(unsigned long)res->end);
+		return -EBUSY;
+	}
 #endif
-	.dev_groups = NULL,
-	.dev_release = foo_classdev_release,
-};                                                                              
 
+	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "Missing resource #%d\n", 0);
+		return -ENOENT;
+	}
 
-/**************************************************************************
- * bus_type
- **************************************************************************/
-
-static ssize_t bus_show(struct bus_type *bus, char *buf)
-{
-	return scnprintf(buf, PAGE_SIZE, "%d\n", bus_bus);
+	dev_info(&pdev->dev, "resource-io=0x%lx-0x%lx\n",
+			(unsigned long)res->start,
+			(unsigned long)res->end);
+#if 0
+	if (!devm_request_region(&pdev->dev, res->start,
+				resource_size(res), "foo-io")) {
+		dev_err(&pdev->dev,
+				"Failed to request region 0x%lx-0x%lx\n",
+				(unsigned long)res->start,
+				(unsigned long)res->end);
+		return -EBUSY;
+	}
+#endif
+	return 0;
 }
 
-static ssize_t bus_store(struct bus_type *bus, 
-		const char *buf, size_t len)
-{
-	sscanf(buf, "%d", &bus_bus);
-
-	return sizeof(int);
-}
-static BUS_ATTR_RW(bus);
-
-static struct attribute *foo_bus_attrs[] = {
-	&bus_attr_bus.attr,
-	NULL
-};
-ATTRIBUTE_GROUPS(foo_bus);
-
-static ssize_t dev_show(struct device *dev, struct device_attribute *attr, 
-	char *buf)
-{
-	return scnprintf(buf, PAGE_SIZE, "%d\n", bus_dev);
-}
-
-static ssize_t dev_store(struct device *dev, struct device_attribute *attr,
-		const char *buf, size_t len)
-{
-	sscanf(buf, "%d", &bus_dev);
-
-	return sizeof(int);
-}
-static DEVICE_ATTR_RW(dev);
-
-static struct attribute *foo_dev_attrs[] = {
-	&dev_attr_dev.attr,
-	NULL
-};
-ATTRIBUTE_GROUPS(foo_dev);
-
-static ssize_t drv_show(struct device_driver *drv, char *buf)
-{
-	return scnprintf(buf, PAGE_SIZE, "%d\n", bus_drv);
-}
-
-static ssize_t drv_store(struct device_driver *drv, 
-		const char *buf, size_t len)
-{
-	sscanf(buf, "%d", &bus_drv);
-
-	return sizeof(int);
-}
-static DRIVER_ATTR_RW(drv);
-
-static struct attribute *foo_drv_attrs[] = {
-	&driver_attr_drv.attr,
-	NULL
-};
-ATTRIBUTE_GROUPS(foo_drv);
-
-static struct bus_type foo_bus = {                                   
-	.name = "foo_bus",
-	.bus_groups = foo_bus_groups,
-	.dev_groups = foo_dev_groups,
-	.drv_groups = foo_drv_groups,
-};                                                                              
-
-static int __init foo2_init(void)
+static int foo2_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 
-	printk("%s\n", __func__);
+	platform_set_drvdata(pdev, NULL);
 
-	ret = class_register(&foo_class);
-	if (ret < 0) {
-		printk("%s: class_register() failed. ret=%d\n",
-				__func__, ret);
-		ret = -1;
-	}
+	ret = get_and_map_resource(pdev);
 
-	ret = bus_register(&foo_bus);
-	if (ret < 0) {
-		printk("%s: bus_register() failed. ret=%d\n",
-				__func__, ret);
-		ret = -1;
-	}
+	printk("%s ret=%d\n", __func__, ret);
 
-	return ret;	/* 0=success */
+	return 0;
 }
 
-static void __exit foo2_exit(void)
-{
-	bus_unregister(&foo_bus);
-	class_unregister(&foo_class);
+#if 0
+static const struct of_device_id of_foo_match[] = {
+	        { .compatible = "foo,foo", },
+		        {},
+};
+#endif
 
-	printk("%s\n", __func__);
-}
+static const struct platform_device_id foo2_ids[] = {
+	{ "foo", },
+	{ }
+};
 
-module_init(foo2_init);
-module_exit(foo2_exit);
+static struct platform_driver foo2_driver = {
+	.driver = {
+		.name = "foo2-driver",
+		.groups = foo_driver_groups,
+		 // .of_match_table = of_foo_match,
+	},
+	.probe          = foo2_probe,
+	.id_table       = foo2_ids,
+};
+
+module_platform_driver(foo2_driver);
 MODULE_LICENSE("GPL");
