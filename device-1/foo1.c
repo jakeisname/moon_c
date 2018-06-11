@@ -43,11 +43,13 @@ static struct platform_device foo_device = {
 	.name = "foo",
 	.id = -1,
 	.dev.groups = foo_groups,
-	.num_resources = ARRAY_SIZE(foo_resource),
-	.resource = foo_resource,
+//	.num_resources = ARRAY_SIZE(foo_resource),
+//	.resource = foo_resource,
 };                                                                              
 
-static int __init foo_init(void)
+extern struct device *foo_parent_dev;
+
+static int __init foo1_init(void)
 {
 	int ret = 0;
 
@@ -60,16 +62,18 @@ static int __init foo_init(void)
 		ret = -1;
 	}
 
+	foo_parent_dev = &foo_device.dev;
+
 	return ret;	/* 0=success */
 }
 
-static void __exit foo_exit(void)
+static void __exit foo1_exit(void)
 {
 	platform_device_unregister(&foo_device);
 
 	printk("%s\n", __func__);
 }
 
-module_init(foo_init);
-module_exit(foo_exit);
+module_init(foo1_init);
+module_exit(foo1_exit);
 MODULE_LICENSE("GPL");
