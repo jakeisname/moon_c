@@ -21,10 +21,6 @@
 
 static const struct attribute_group *foo_class_groups[];
 
-int export = -1;
-int bus_bus = 0;
-int bus_dev = 0;
-int bus_drv = 0;
 static struct device *new_dev = NULL;
 struct device *foo0_dev = NULL;
 
@@ -32,8 +28,9 @@ struct device *foo0_dev = NULL;
 EXPORT_SYMBOL(foo0_dev);
 
 /**************************************************************************
- * class
+ * export & unexport class attribute
  **************************************************************************/
+int export = -1;
 
 void export_device(struct device *dev, int export);
 
@@ -104,12 +101,39 @@ static struct class_attribute foo_class_attrs[] = {
 };
 #endif
 
+/**************************************************************************
+ * class_dev device attribute
+ **************************************************************************/
+static int class_dev = 0;
+
+static ssize_t class_dev_show(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", class_dev);
+}
+
+static ssize_t class_dev_store(struct device *dev, 
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	sscanf(buf, "%d", &class_dev);
+	return sizeof(int);
+}
+
+static DEVICE_ATTR_RW(class_dev);
+static struct attribute *class_dev_attrs[] = {
+	&dev_attr_class_dev.attr,
+	NULL
+};
+ATTRIBUTE_GROUPS(class_dev);
+
+
+/**************************************************************************
+ * foo_class
+ **************************************************************************/
 static void foo_classdev_release(struct device *dev)
 {
 	printk("%s\n", __func__);
 }
-
-
 
 struct class foo_class = {                                   
 	.name = "foo_class",
@@ -119,10 +143,9 @@ struct class foo_class = {
 #else
 	.class_attrs = foo_class_attrs,
 #endif
-	.dev_groups = NULL,
+	.dev_groups = class_dev_groups,
 	.dev_release = foo_classdev_release,
 };                                                                              
-
 EXPORT_SYMBOL(foo_class);
 
 void export_device(struct device *dev, int export)
@@ -133,8 +156,9 @@ void export_device(struct device *dev, int export)
 }
 
 /**************************************************************************
- * bus_type
+ * bus_bus bus attribute
  **************************************************************************/
+static int bus_bus = 0;
 
 static ssize_t bus_bus_show(struct bus_type *bus, char *buf)
 {
@@ -155,6 +179,11 @@ static struct attribute *bus_bus_attrs[] = {
 	NULL
 };
 ATTRIBUTE_GROUPS(bus_bus);
+
+/**************************************************************************
+ * bus_dev device attribute
+ **************************************************************************/
+static int bus_dev = 0;
 
 static ssize_t bus_dev_show(struct device *dev, struct device_attribute *attr, 
 	char *buf)
@@ -177,6 +206,11 @@ static struct attribute *bus_dev_attrs[] = {
 };
 ATTRIBUTE_GROUPS(bus_dev);
 
+/**************************************************************************
+ * bus_drv driver attribute
+ **************************************************************************/
+static int bus_drv = 0;
+
 static ssize_t bus_drv_show(struct device_driver *drv, char *buf)
 {
 	return scnprintf(buf, PAGE_SIZE, "%d\n", bus_drv);
@@ -197,6 +231,9 @@ static struct attribute *bus_drv_attrs[] = {
 };
 ATTRIBUTE_GROUPS(bus_drv);
 
+/**************************************************************************
+ * foo_bus
+ **************************************************************************/
 int foo_bus_match(struct device *dev, struct device_driver *drv)
 {  
 	struct foo_device *pdev;
