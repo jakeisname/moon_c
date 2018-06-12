@@ -2,7 +2,7 @@
 문c 블로그 with ARM64 Linux Kernel 4.x
 http://jake.dothome.co.kr
 
-char
+* char
   - new_gpio_api.c  gpio 캐릭터 디바이스로 gpio 핀 제어 테스트 샘플  (파일을 직접 열고 ioctl로 제어)
   - new_gpio_api2.c  gpio 캐릭터 디바이스로 gpio 핀 제어 테스트 샘플 (gpiod api 사용)
   
