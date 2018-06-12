@@ -28,7 +28,6 @@ static ssize_t sub_dev_store(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t len)
 {
 	sscanf(buf, "%d", &sub_dev);
-	// sysfs_notify(&dev->kobj, NULL, "sub_dev");
 	return sizeof(int);
 }
 
@@ -70,17 +69,23 @@ ATTRIBUTE_GROUPS(sub_drv);
 /****************************
  * define device
  ****************************/
+static void foo_client1_release(struct device *dev)
+{
+	printk("%s\n", __func__);
+}
+
 static struct device sub_device = { 
-	.init_name = "sub",
+	.init_name = "foo-client1-device",
 	.groups = sub_dev_groups,
 	.bus = &foo_bus,
 	.parent = &foo_platform_device.dev,
+	.release = foo_client1_release,
 };                                                                              
 
 /****************************
  * define driver 
  ****************************/
-static int sub_probe(struct device *dev)
+static int foo_client1_probe(struct device *dev)
 {
 	int ret = 0;
 
@@ -90,8 +95,9 @@ static int sub_probe(struct device *dev)
 }
 
 static struct device_driver sub_driver = {
-	.name = "sub-driver",
-	.probe  = sub_probe,
+	.name = "foo-client1-driver",
+	.owner = THIS_MODULE,
+	.probe  = foo_client1_probe,
 	.groups = sub_drv_groups,
 	.bus = &foo_bus,
 };
@@ -99,7 +105,7 @@ static struct device_driver sub_driver = {
 /****************************
  * module
  ****************************/
-static int __init foo_init(void)
+static int __init foo_client1_init(void)
 {
 	int ret = 0;
 
@@ -127,7 +133,7 @@ err2:
 	return ret;
 }
 
-static void __exit foo_exit(void)
+static void __exit foo_client1_exit(void)
 {
 	driver_unregister(&sub_driver);
 	device_unregister(&sub_device);
@@ -135,6 +141,6 @@ static void __exit foo_exit(void)
 	printk("%s\n", __func__);
 }
 
-module_init(foo_init);
-module_exit(foo_exit);
+module_init(foo_client1_init);
+module_exit(foo_client1_exit);
 MODULE_LICENSE("GPL");

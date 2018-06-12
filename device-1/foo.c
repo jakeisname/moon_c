@@ -197,11 +197,37 @@ static struct attribute *bus_drv_attrs[] = {
 };
 ATTRIBUTE_GROUPS(bus_drv);
 
+int foo_bus_match(struct device *dev, struct device_driver *drv)
+{  
+	struct foo_device *pdev;
+	struct foo_driver *pdrv;
+	int match;
+
+	match = (!strcmp(dev->kobj.name, "foo-client1-device") && 
+			!strcmp(drv->name, "foo-client1-driver"));
+	printk("dev=%s, drv=%s name %s\n", dev->kobj.name, drv->name, 
+			match ? "matched" : "skip");
+
+	if (match)
+		return 1;
+
+	pdev = to_foo_device(dev);                     
+	pdrv = to_foo_driver(drv);                     
+
+	printk("pdev=%p, pdrv=%p\n", pdev, pdrv);
+	match = (pdev->match_id == pdrv->match_id);
+	printk("pdev->match_id=%d, pdrv->match_id=%d id %s\n", 
+			pdev->match_id, pdrv->match_id, match ? "matched" : "skip");
+
+	return match;
+}
+
 struct bus_type foo_bus = {                                   
 	.name = "foo_bus",
 	.bus_groups = bus_bus_groups,
 	.dev_groups = bus_dev_groups,
 	.drv_groups = bus_drv_groups,
+	.match = foo_bus_match,
 };                                                                              
 
 EXPORT_SYMBOL(foo_bus);

@@ -67,14 +67,21 @@ ATTRIBUTE_GROUPS(sub2_drv);
 /****************************
  * define foo_device
  ****************************/
+static void foo_client2_release(struct device *dev)
+{
+	printk("%s\n", __func__);
+}
+
 static struct foo_device sub_device = { 
-	.name = "sub2",
+	.match_id = 1,
+	.name = "foo-client2-device",
 	.dev.parent = &foo_platform_device.dev,
 	.dev.groups = sub2_dev_groups,
+	.dev.release = foo_client2_release,
 };                                                                              
 
 
-static int sub2_probe(struct foo_device *dev)
+static int foo_client2_probe(struct foo_device *dev)
 {
 	int ret = 0;
 
@@ -83,7 +90,7 @@ static int sub2_probe(struct foo_device *dev)
 	return 0;
 }
 
-static int sub2_remove(struct foo_device *dev)
+static int foo_client2_remove(struct foo_device *dev)
 {
 	int ret = 0;
 
@@ -96,18 +103,19 @@ static int sub2_remove(struct foo_device *dev)
  * define foo_driver
  ****************************/
 static struct foo_driver sub_driver = {                               
+	.match_id = 1,
     .driver = {                                                                 
-        .name = "sub2-driver",
+        .name = "foo-client2-driver",
 		.groups = sub2_drv_groups,
     },                                                                          
-    .probe = sub2_probe,
-    .remove = sub2_remove,
+    .probe = foo_client2_probe,
+    .remove = foo_client2_remove,
 }; 
 
 /****************************
  * module
  ****************************/
-static int __init foo_init(void)
+static int __init foo_client2_init(void)
 {
 	int ret = 0;
 
@@ -134,7 +142,7 @@ err2:
 	return ret;
 }
 
-static void __exit foo_exit(void)
+static void __exit foo_client2_exit(void)
 {
 	foo_driver_unregister(&sub_driver);
 	foo_device_unregister(&sub_device);
@@ -142,6 +150,6 @@ static void __exit foo_exit(void)
 	printk("%s\n", __func__);
 }
 
-module_init(foo_init);
-module_exit(foo_exit);
+module_init(foo_client2_init);
+module_exit(foo_client2_exit);
 MODULE_LICENSE("GPL");

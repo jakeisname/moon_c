@@ -6,11 +6,13 @@
  **************************************************************************/    
 
 struct foo_device {
+	int match_id;
 	char *name;
     struct device dev;                                                
 };
 
 struct foo_driver {
+	int match_id;
     struct device_driver driver;                                                
     int (*probe)(struct foo_device *);                                     
     int (*remove)(struct foo_device *);                                    
