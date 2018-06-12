@@ -8,7 +8,8 @@ http://jake.dothome.co.kr
   
   
 * device-1
-  - foo.c         foo_bus와 foo_class 등록
+  - foo.c         
+    - foo_bus와 foo_class 등록
   - foo_pdev.c    foo 버스 컨트롤러 플랫폼 디바이스 등록
   - foo_pdrv.c    foo 버스 컨트롤러 플랫폼 드라이버 등록
   - foo_client1.c foo 클라이언트 디바이스 및 드라이버 등록
