@@ -20,6 +20,17 @@ http://jake.dothome.co.kr
     - foo_client1.c와 동일하지만 foo_device_register() 및 foo_driver_register() 사용
 
 
+* device-2
+  - foo.c         
+    - foo 디바이스 등록과 with 디바이스 속성
+  - foo2.c
+    - foo2 디바이스 등록 with 디바이스 속성(플랫폼 디바이스로 등록)
+  - foo3.c
+    - foo3 플랫폼 디바이스 등록 with 디바이스 속성
+  - drv3.c 
+    - drv3 플랫폼 드라이버 등록 with 드라이버 속성(foo3 디바이스와 pair)
+  
+
 * foo-gpio
   - gpio.c        
     - gpio 컨트롤러에 legacy 인터럽트 연동 샘플
