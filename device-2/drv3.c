@@ -45,7 +45,7 @@ static int drv3_probe(struct platform_device *pdev)
 } 
 
 static const struct platform_device_id drv3_id_table[] = {                      
-	{ "foo3",    (unsigned long) &foo3_id },
+	{ "foo3", 0 },
 	{ },
 };                                                                              
 
@@ -57,20 +57,12 @@ static const struct of_device_id drv3_of_match_table[] = {
 }; 
 MODULE_DEVICE_TABLE(of, drv3_of_match_table);
 
-static struct platform_driver foo_driver = {                               
-	.probe      = foo_probe,                                               
-	.driver     = {
-		.name   = "foo",
-		.of_match_table = of_match_ptr(foo_ids),
-	},                                                                          
-	.id_table   = foo_id_table,                                                
-};
-
 static struct platform_driver drv3 = {
 	.probe = drv3_probe,
 	.id_table = drv3_id_table,
 	.driver = {
-		.name = "drv3"
+		.name = "drv3",
+		.groups = drv3_driver_groups,
 		.of_match_table = drv3_of_match_table,
 	},
 };                                                                              
