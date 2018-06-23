@@ -66,29 +66,23 @@ static int drv3_probe(struct platform_device *pdev)
 
 	/* get platform resource */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);                   
-        printk("%s iomem resource. start=0x%lld, size=0x%lld\n", 
+        printk("%s iomem resource. start=0x%x, size=0x%x\n", 
 			__func__, res->start, res->end - res->start);
 
-	return 0;
-
 	/* ioremap */
-#if 0
 	foo->base = devm_ioremap_resource(&pdev->dev, res);
         printk("%s iomem resource. base=0x%p\n",
 			__func__, foo->base);
-#endif
 
 	/* get irq */
 	foo->irq = platform_get_irq(pdev, 0);
         printk("%s irq=%d\n", __func__, foo->irq);
   
 	/* request irq */
-#if 0
 	ret = devm_request_threaded_irq(&pdev->dev, foo->irq,                         
 		  NULL, foo_irq_handler,                           
 		  IRQF_SHARED | IRQF_ONESHOT,                             
 		  "drv3", foo);                                         
-#endif
 	
 	dev_info(&pdev->dev, "request_irq() irq=%d, ret=%d\n",
 		  foo->irq, ret); 

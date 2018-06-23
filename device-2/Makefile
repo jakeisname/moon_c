@@ -1,7 +1,10 @@
 obj-m := foo.o foo2.o foo3.o drv3.o
 
+KDIR := 4.14.37-g744dfee
+#KDIR := $(shell uname -r)
+
 all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+	make -C /lib/modules/${KDIR}/build M=$(PWD) modules
 
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	make -C /lib/modules/${KDIR}/build M=$(PWD) clean
