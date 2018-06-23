@@ -42,10 +42,25 @@ static void foo3_release(struct device *dev)
         printk("%s\n", __func__);                                               
 } 
 
+static struct resource foo_resource[] = {
+	{	
+	 .start = 0xf000e000,                                                    
+	 .end = 0xf000e000 + 0x100,
+	 .flags = IORESOURCE_MEM,                                                
+	},
+	{	
+	 .start = 20,
+	 .end = 20,
+	 .flags = IORESOURCE_IRQ,                                                
+	},
+}; 
+
 static struct platform_device foo3 = {
 	.name = "foo3",
 	.id = -1,	/* id=0  -> device name is foo3.0 */
 			/* id=-1 -> device name is foo3   */
+	.resource = foo_resource,
+	.num_resources = ARRAY_SIZE(foo_resource),
 	.dev = {
 		.groups = foo3_device_groups,
 		.platform_data = &foo3,
