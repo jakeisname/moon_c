@@ -7,7 +7,7 @@ http://jake.dothome.co.kr
   - new_gpio_api2.c  gpio 캐릭터 디바이스로 gpio 핀 제어 테스트 샘플 (gpiod api 사용)
   
   
-* device-1
+* device-1 디렉토리
   - foo.c         
     - foo_bus와 foo_class 등록
   - foo_pdev.c    
@@ -20,33 +20,37 @@ http://jake.dothome.co.kr
     - foo_client1.c와 동일하지만 foo_device_register() 및 foo_driver_register() 사용
 
 
-* device-2
+* device-2 디렉토리
   - foo.c         
     - foo 디바이스 등록과 with 디바이스 속성
   - foo2.c
     - foo2 디바이스 등록 with 디바이스 속성(플랫폼 디바이스로 등록)
   - foo3.c
-    - foo3 플랫폼 디바이스 등록 with 디바이스 속성
+    - foo3 플랫폼 디바이스 등록
+    - 디바이스 속성 추가
+    - 플랫폼 리소스 등록(iomem, irq)
   - drv3.c 
-    - drv3 플랫폼 드라이버 등록 with 드라이버 속성(foo3 디바이스와 pair)
-  
+    - drv3 플랫폼 드라이버 등록(foo3 디바이스와 pair)
+    - 드라이버 속성 추가
+    - 플랫폼 리소스를 얻어와서 사용하는 방법  
 
-* foo-gpio
+
+* foo-gpio 디렉토리
   - gpio.c        
     - gpio 컨트롤러에 legacy 인터럽트 연동 샘플
 
 
-* foo-gpio-pci
+* foo-gpio-pci 디렉토리
   - gpio.c        
     - pci 플랫폼 드라이버에 gpio 컨트롤러를 연동하고 legacy 인터럽트 연동 샘플
 
 
-* msi
+* msi 디렉토리
   - gpio.c          
     - pci 플랫폼 드라이버에 gpio 컨트롤러를 연동하고 msi 인터럽트 연동 샘플 (홀딩)
 
 
-* sysfs
+* sysfs 디렉토리
   - foo1.c        
     - sysfs 속성 및 이벤트 발생 테스트 (kobject_add 사용)
   - foo2.c        
