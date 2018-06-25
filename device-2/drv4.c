@@ -113,12 +113,12 @@ static int drv4_probe(struct platform_device *pdev)
 
 	/* get foo-prop-val32 */
 	ret = of_property_read_u32(foo->dev->dev.of_node, 
-			"foo-prop-val32", &foo->foo_val32); 
-        dev_info(&pdev->dev, "foo_val32=%u, ret=%d\n", foo->foo_val32, ret);
+			"my-prop-val32", &foo->foo_val32); 
+        dev_info(&pdev->dev, "foo_val32=0x%x, ret=%d\n", foo->foo_val32, ret);
 
 	/* get foo-prop-string */
 	ret = of_property_read_string(foo->dev->dev.of_node, 
-			"foo-prop-string", &foo->foo_string);
+			"my-prop-string", &foo->foo_string);
         dev_info(&pdev->dev, "foo_string=%s, ret=%d\n", foo->foo_string, ret);
 
 	return 0;
