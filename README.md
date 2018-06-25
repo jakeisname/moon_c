@@ -33,6 +33,13 @@ http://jake.dothome.co.kr
     - drv3 플랫폼 드라이버 등록(foo3 디바이스와 pair)
     - 드라이버 속성 추가
     - 플랫폼 리소스를 얻어와서 사용하는 방법  
+  - drv4.c 
+    - drv4 플랫폼 드라이버 등록(virt.dts의 foo4 노드에서 등록시킨 플랫폼 디바이스와 pair)
+    - 드라이버 속성 추가
+    - 디바이스 트리와 연동하여 플랫폼 리소스를 얻어와서 사용하는 방법
+    - 디바이스 트리 노드에서 custom 속성 알아오는 방법
+  - virt.dts
+    - qemu용 default virt 디바이스 트리에 foo4 노드를 추가 (drv4.c와 연동)
 
 
 * foo-gpio 디렉토리
