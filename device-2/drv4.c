@@ -96,7 +96,7 @@ static int drv4_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "platform irq resources not found.\n");
 		return foo->irq;
 	}
-	dev_info(&pdev->dev, "irq=%d\n", foo->irq);
+	dev_info(&pdev->dev, "irq resource. irq=%d\n", foo->irq);
 
 	/* step 5) request irq */
 	ret = devm_request_threaded_irq(&pdev->dev, foo->irq,
