@@ -8,33 +8,33 @@
 #include <linux/interrupt.h>
 
 /**************************************************************************
- * d3 device attribute
+ * d4 device attribute
  **************************************************************************/
-int d3 = 0;
+int d4 = 0;
 
-static ssize_t d3_show(struct device_driver *driver,  
+static ssize_t d4_show(struct device_driver *driver,  
 		char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%d\n", d3);
+	return scnprintf(buf, PAGE_SIZE, "%d\n", d4);
 }
 
-static ssize_t d3_store(struct device_driver *driver,
+static ssize_t d4_store(struct device_driver *driver,
 		const char *buf, size_t len)
 {
-	sscanf(buf, "%d", &d3);
+	sscanf(buf, "%d", &d4);
 	return sizeof(int);
 }
 
-static DRIVER_ATTR_RW(d3);
-static struct attribute *drv3_driver_attrs[] = {
-	&driver_attr_d3.attr,
+static DRIVER_ATTR_RW(d4);
+static struct attribute *drv4_driver_attrs[] = {
+	&driver_attr_d4.attr,
 	NULL
 };
-ATTRIBUTE_GROUPS(drv3_driver);
+ATTRIBUTE_GROUPS(drv4_driver);
 
 
 /**************************************************************************
- * drv3 driver
+ * drv4 driver
  **************************************************************************/
 
 struct foo_data {
@@ -50,7 +50,7 @@ static irqreturn_t foo_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static int drv3_probe(struct platform_device *pdev)
+static int drv4_probe(struct platform_device *pdev)
 { 
 	int ret = 0;
 	struct foo_data *foo;
@@ -83,7 +83,7 @@ static int drv3_probe(struct platform_device *pdev)
 	ret = devm_request_threaded_irq(&pdev->dev, foo->irq,                         
 		  NULL, foo_irq_handler,                           
 		  IRQF_SHARED | IRQF_ONESHOT,                             
-		  "drv3", foo);                                         
+		  "drv4", foo);                                         
 	
 	dev_info(&pdev->dev, "request_irq() irq=%d, ret=%d\n",
 		  foo->irq, ret); 
@@ -91,29 +91,29 @@ static int drv3_probe(struct platform_device *pdev)
 	return 0;
 } 
 
-static const struct platform_device_id drv3_id_table[] = {                      
-	{ "foo3", 0 },
+static const struct platform_device_id drv4_id_table[] = {                      
+	{ "foo4", 0 },
 	{ },
 };                                                                              
 
-static const struct of_device_id drv3_of_match_table[] = { 
+static const struct of_device_id drv4_of_match_table[] = { 
     { 
-        .compatible = "foo3,foo3", 
+        .compatible = "foo4,foo4", 
     }, 
     { /* sentinel */ }, 
 }; 
-MODULE_DEVICE_TABLE(of, drv3_of_match_table);
+MODULE_DEVICE_TABLE(of, drv4_of_match_table);
 
-static struct platform_driver drv3 = {
-	.probe = drv3_probe,
-	.id_table = drv3_id_table,
+static struct platform_driver drv4 = {
+	.probe = drv4_probe,
+	.id_table = drv4_id_table,
 	.driver = {
-		.name = "drv3",
-		.groups = drv3_driver_groups,
-		.of_match_table = drv3_of_match_table,
+		.name = "drv4",
+		.groups = drv4_driver_groups,
+		.of_match_table = drv4_of_match_table,
 	},
 };                                                                              
 
-module_platform_driver(drv3);
+module_platform_driver(drv4);
 MODULE_LICENSE("GPL");
 
