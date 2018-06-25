@@ -98,7 +98,7 @@ static const struct platform_device_id drv4_id_table[] = {
 
 static const struct of_device_id drv4_of_match_table[] = { 
     { 
-        .compatible = "foo4,foo4", 
+        .compatible = "foo,foo4", 
     }, 
     { /* sentinel */ }, 
 }; 
