@@ -6,6 +6,8 @@
 #include <linux/export.h>                                              
 #include <linux/property.h>                                                     
 #include <linux/interrupt.h>
+#include <linux/of.h>
+#include <linux/err.h>
 
 /**************************************************************************
  * d4 device attribute
@@ -41,6 +43,8 @@ struct foo_data {
 	struct platform_device *dev;
 	int irq;
 	void __iomem *base;
+	u32 foo_val32;
+	const char *foo_string;
 };
 
 static irqreturn_t foo_irq_handler(int irq, void *data)
@@ -65,28 +69,57 @@ static int drv4_probe(struct platform_device *pdev)
 	foo->dev = pdev;
 
 	/* get platform resource */
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);                   
-        printk("%s iomem resource. start=0x%lx, size=0x%lx\n", 
-			__func__, (long unsigned int) res->start, 
-			(long unsigned int) (res->end - res->start));
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (res == NULL) {
+		dev_err(&pdev->dev, "platform mem resources not found.\n");
+		return -ENOENT;
+	}
+
+        dev_info(&pdev->dev, "iomem resource. start=0x%lx, size=0x%lx\n", 
+			(long unsigned int) res->start, 
+			(long unsigned int) (res->end - res->start + 1));
 
 	/* ioremap */
 	foo->base = devm_ioremap_resource(&pdev->dev, res);
-        printk("%s iomem resource. base=0x%p\n",
-			__func__, foo->base);
+	if (IS_ERR(foo->base)) {
+		dev_err(&pdev->dev, "devm_ioremap_resource() failed.\n");
+		return -ENOMEM;
+	}
+	
+        dev_info(&pdev->dev, "iomem resource. base=0x%p\n", foo->base);
 
 	/* get irq */
 	foo->irq = platform_get_irq(pdev, 0);
-        printk("%s irq=%d\n", __func__, foo->irq);
-  
+	if (foo->irq < 0) {
+		dev_err(&pdev->dev, "platform irq resources not found.\n");
+		return foo->irq;
+	}
+	dev_info(&pdev->dev, "irq=%d\n", foo->irq);
+
 	/* request irq */
-	ret = devm_request_threaded_irq(&pdev->dev, foo->irq,                         
-		  NULL, foo_irq_handler,                           
-		  IRQF_SHARED | IRQF_ONESHOT,                             
-		  "drv4", foo);                                         
+	ret = devm_request_threaded_irq(&pdev->dev, foo->irq,
+			NULL, foo_irq_handler,
+			IRQF_SHARED | IRQF_ONESHOT,                             
+			"drv4", foo);
+	if (ret) {
+		dev_err(&pdev->dev, 
+				"devm_request_threaded_irq() failed. err=%d\n",
+				ret);
+		return ret;
+	}
 	
-	dev_info(&pdev->dev, "request_irq() irq=%d, ret=%d\n",
-		  foo->irq, ret); 
+	dev_info(&pdev->dev, "devm_request_threaded_irq() irq=%d, ret=%d\n",
+			foo->irq, ret); 
+
+	/* get foo-prop-val32 */
+	ret = of_property_read_u32(foo->dev->dev.of_node, 
+			"foo-prop-val32", &foo->foo_val32); 
+        dev_info(&pdev->dev, "foo_val32=%u, ret=%d\n", foo->foo_val32, ret);
+
+	/* get foo-prop-string */
+	ret = of_property_read_string(foo->dev->dev.of_node, 
+			"foo-prop-string", &foo->foo_string);
+        dev_info(&pdev->dev, "foo_string=%s, ret=%d\n", foo->foo_string, ret);
 
 	return 0;
 } 

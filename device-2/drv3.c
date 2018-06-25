@@ -68,7 +68,7 @@ static int drv3_probe(struct platform_device *pdev)
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);                   
         printk("%s iomem resource. start=0x%lx, size=0x%lx\n", 
 			__func__, (long unsigned int) res->start, 
-			(long unsigned int) (res->end - res->start));
+			(long unsigned int) (res->end - res->start + 1));
 
 	/* ioremap */
 	foo->base = devm_ioremap_resource(&pdev->dev, res);
