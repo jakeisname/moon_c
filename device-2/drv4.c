@@ -60,26 +60,28 @@ static int drv4_probe(struct platform_device *pdev)
 	struct foo_data *foo;
 	struct resource *res;
 
-        printk("%s\n", __func__);
+	dev_info(&pdev->dev, "%s\n", __func__);
 
+	/* step 1) alloc driver data */
 	foo = devm_kzalloc(&pdev->dev, sizeof(*foo), GFP_KERNEL);
 	if (!foo)                                                         
 		return -ENOMEM; 
 
 	foo->dev = pdev;
+	platform_set_drvdata(pdev, foo);
 
-	/* get platform resource */
+	/* step 2) get platform resource */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (res == NULL) {
+	if (!res) {
 		dev_err(&pdev->dev, "platform mem resources not found.\n");
-		return -ENOENT;
+		return -EINVAL;
 	}
 
         dev_info(&pdev->dev, "iomem resource. start=0x%lx, size=0x%lx\n", 
 			(long unsigned int) res->start, 
 			(long unsigned int) (res->end - res->start + 1));
 
-	/* ioremap */
+	/* step 3) ioremap */
 	foo->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(foo->base)) {
 		dev_err(&pdev->dev, "devm_ioremap_resource() failed.\n");
@@ -88,7 +90,7 @@ static int drv4_probe(struct platform_device *pdev)
 	
         dev_info(&pdev->dev, "iomem resource. base=0x%p\n", foo->base);
 
-	/* get irq */
+	/* step 4) get irq */
 	foo->irq = platform_get_irq(pdev, 0);
 	if (foo->irq < 0) {
 		dev_err(&pdev->dev, "platform irq resources not found.\n");
@@ -96,7 +98,7 @@ static int drv4_probe(struct platform_device *pdev)
 	}
 	dev_info(&pdev->dev, "irq=%d\n", foo->irq);
 
-	/* request irq */
+	/* step 5) request irq */
 	ret = devm_request_threaded_irq(&pdev->dev, foo->irq,
 			NULL, foo_irq_handler,
 			IRQF_SHARED | IRQF_ONESHOT,                             
@@ -111,15 +113,15 @@ static int drv4_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "devm_request_threaded_irq() irq=%d, ret=%d\n",
 			foo->irq, ret); 
 
-	/* get foo-prop-val32 */
+	/* step 6) get foo-prop-val32 */
 	ret = of_property_read_u32(foo->dev->dev.of_node, 
 			"my-prop-val32", &foo->foo_val32); 
-        dev_info(&pdev->dev, "foo_val32=0x%x, ret=%d\n", foo->foo_val32, ret);
+        dev_info(&pdev->dev, "my-prop-val32=0x%x, ret=%d\n", foo->foo_val32, ret);
 
-	/* get foo-prop-string */
+	/* step 7) get foo-prop-string */
 	ret = of_property_read_string(foo->dev->dev.of_node, 
 			"my-prop-string", &foo->foo_string);
-        dev_info(&pdev->dev, "foo_string=%s, ret=%d\n", foo->foo_string, ret);
+        dev_info(&pdev->dev, "my-prop-string=%s, ret=%d\n", foo->foo_string, ret);
 
 	return 0;
 } 

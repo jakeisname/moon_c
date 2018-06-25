@@ -56,37 +56,58 @@ static int drv3_probe(struct platform_device *pdev)
 	struct foo_data *foo;
 	struct resource *res;
 
-        printk("%s\n", __func__);
+	dev_info(&pdev->dev, "%s\n", __func__);
 
+	/* step 1) alloc driver data */
 	foo = devm_kzalloc(&pdev->dev, sizeof(*foo), GFP_KERNEL);
 	if (!foo)                                                         
 		return -ENOMEM; 
 
 	foo->dev = pdev;
+	platform_set_drvdata(pdev, foo);
 
-	/* get platform resource */
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);                   
-        printk("%s iomem resource. start=0x%lx, size=0x%lx\n", 
-			__func__, (long unsigned int) res->start, 
+	/* step 2) get platform resource */
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "platform mem resources not found.\n");
+		return -EINVAL;
+	}
+
+        dev_info(&pdev->dev, "iomem resource. start=0x%lx, size=0x%lx\n", 
+			(long unsigned int) res->start, 
 			(long unsigned int) (res->end - res->start + 1));
 
-	/* ioremap */
+	/* step 3) ioremap */
 	foo->base = devm_ioremap_resource(&pdev->dev, res);
-        printk("%s iomem resource. base=0x%p\n",
-			__func__, foo->base);
-
-	/* get irq */
-	foo->irq = platform_get_irq(pdev, 0);
-        printk("%s irq=%d\n", __func__, foo->irq);
-  
-	/* request irq */
-	ret = devm_request_threaded_irq(&pdev->dev, foo->irq,                         
-		  NULL, foo_irq_handler,                           
-		  IRQF_SHARED | IRQF_ONESHOT,                             
-		  "drv3", foo);                                         
+	if (IS_ERR(foo->base)) {
+		dev_err(&pdev->dev, "devm_ioremap_resource() failed.\n");
+		return -ENOMEM;
+	}
 	
-	dev_info(&pdev->dev, "request_irq() irq=%d, ret=%d\n",
-		  foo->irq, ret); 
+        dev_info(&pdev->dev, "iomem resource. base=0x%p\n", foo->base);
+
+	/* step 4) get irq */
+	foo->irq = platform_get_irq(pdev, 0);
+	if (foo->irq < 0) {
+		dev_err(&pdev->dev, "platform irq resources not found.\n");
+		return foo->irq;
+	}
+	dev_info(&pdev->dev, "irq=%d\n", foo->irq);
+
+	/* step 5) request irq */
+	ret = devm_request_threaded_irq(&pdev->dev, foo->irq,
+			NULL, foo_irq_handler,
+			IRQF_SHARED | IRQF_ONESHOT,                             
+			"drv4", foo);
+	if (ret) {
+		dev_err(&pdev->dev, 
+				"devm_request_threaded_irq() failed. err=%d\n",
+				ret);
+		return ret;
+	}
+	
+	dev_info(&pdev->dev, "devm_request_threaded_irq() irq=%d, ret=%d\n",
+			foo->irq, ret); 
 
 	return 0;
 } 
