@@ -16,9 +16,10 @@
 #include <linux/property.h>                                                     
 #include <linux/interrupt.h>
 
-#include "/home/jake/workspace/lsk-4.14/drivers/pinctrl/core.h"
-#include "/home/jake/workspace/lsk-4.14/drivers/pinctrl/pinctrl-utils.h"
-
+//#include "/home/jake/workspace/lsk-4.14/drivers/pinctrl/core.h"
+//#include "/home/jake/workspace/lsk-4.14/drivers/pinctrl/pinctrl-utils.h"
+#include "/usr/src/lsk-4.14/drivers/pinctrl/core.h"
+#include "/usr/src/lsk-4.14/drivers/pinctrl/pinctrl-utils.h"
 
 struct foo_group {
 	const char *name;
