@@ -396,4 +396,9 @@
 		my-prop-val32 = <0x12345678>;
 		my-prop-string = "test string";
 	};
+
+	foo-pinctrl {
+		compatible = "foo,foo-pinctrl";
+		reg = <0x0 0xf000e000 0x0 0x100>;	
+	};
 };

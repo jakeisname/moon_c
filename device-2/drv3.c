@@ -39,8 +39,8 @@ ATTRIBUTE_GROUPS(drv3_driver);
 
 struct foo_data {
 	struct platform_device *dev;
-	int irq;
-	void __iomem *base;
+	int irq;		/* virq */
+	void __iomem *base;	/* virtual address of device register */
 };
 
 static irqreturn_t foo_irq_handler(int irq, void *data)

@@ -1,10 +1,11 @@
-obj-m := foo.o foo2.o foo3.o drv3.o drv4.o
+obj-m := foo.o foo2.o foo3.o drv3.o drv4.o my-pinctrl.o
 
 #KDIR := 4.14.37-g744dfee
-KDIR := $(shell uname -r)
+#KDIR := /lib/modules/$(shell uname -r)/build
+KDIR := /home/jake/workspace/lsk-4.14
 
 all:
-	make -C /lib/modules/${KDIR}/build M=$(PWD) modules
+	make -C ${KDIR} M=$(PWD) modules
 
 clean:
-	make -C /lib/modules/${KDIR}/build M=$(PWD) clean
+	make -C ${KDIR} M=$(PWD) clean
