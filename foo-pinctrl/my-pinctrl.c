@@ -64,7 +64,7 @@ static struct pinctrl_pin_desc foo_pins[] = {
 
 static const unsigned int gpio_0_3_pins[] = {0, 1, 2, 3};
 static const unsigned int nand_0_3_pins[] = {0, 1, 2, 3};
-static const unsigned int uart_0_3_pins[] = {0, 1, 2, 3,};
+static const unsigned int uart_0_3_pins[] = {0, 1, 2, 3};
 
 static const unsigned int nand_4_5_pins[] = {4, 5};
 static const unsigned int uart_4_5_pins[] = {4, 5};
@@ -117,9 +117,9 @@ static const struct foo_group foo_groups[] = {
 		.num_pins = ARRAY_SIZE(uart_6_7_pins),
 	},
 	{
-		.name = "uart_6_7_grp",
-		.pins = uart_6_7_pins,
-		.num_pins = ARRAY_SIZE(uart_6_7_pins),
+		.name = "i2c_6_7_grp",
+		.pins = i2c_6_7_pins,
+		.num_pins = ARRAY_SIZE(i2c_6_7_pins),
 	},
 };
 
