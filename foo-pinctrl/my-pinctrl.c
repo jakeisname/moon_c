@@ -373,7 +373,6 @@ static struct pinctrl_desc foo_pinctrl_desc = {
 static int foo_pinctrl_probe(struct platform_device *pdev)
 {
 	struct foo_pinctrl *pinctrl;
-	struct pinctrl_pin_desc *pins;
 	unsigned int num_pins = ARRAY_SIZE(foo_pins);
 	int i;
 
@@ -389,16 +388,11 @@ static int foo_pinctrl_probe(struct platform_device *pdev)
 	pinctrl->functions = foo_functions;
 	pinctrl->num_functions = ARRAY_SIZE(foo_functions);
 
-	pins = devm_kcalloc(&pdev->dev, num_pins, sizeof(*pins), GFP_KERNEL);   
-	if (!pins)                                                              
-		return -ENOMEM;                                                 
 	for (i = 0; i < num_pins; i++) {                                        
-		pins[i].number = foo_pins[i].number;                               
-		pins[i].name = foo_pins[i].name;                                
-		pins[i].drv_data = &foo_pins[i];                                
+		foo_pins[i].drv_data = &foo_pins[i];                                
 	}
 
-	foo_pinctrl_desc.pins = pins;
+	foo_pinctrl_desc.pins = foo_pins;
 	foo_pinctrl_desc.npins = num_pins;
 
 	pinctrl->pctl = pinctrl_register(&foo_pinctrl_desc, &pdev->dev,
