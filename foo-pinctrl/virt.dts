@@ -439,7 +439,7 @@
 		mfio_2_3_conf: mfio_2_3_conf {
 			pins = "mfio_2",
 			       "mfio_3";
-			ouput-enable;
+			output-enable;
 		};
 	};
 };
