@@ -400,5 +400,40 @@
 	foo-pinctrl {
 		compatible = "foo,foo-pinctrl";
 		reg = <0x0 0xf000e000 0x0 0x100>;	
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&nand_sel>;
+
+		gpio_sel: gpio_sel {
+			function = "gpio";
+			groups = "gpio_0_3_grp",
+				 "gpio_4_5_grp",
+				 "gpio_6_7_grp";
+		};
+
+		gpio_0_5_sel: gpio_0_5_sel {
+			function = "gpio";
+			groups = "gpio_0_3_grp",
+				 "gpio_4_5_grp";
+		};
+
+		nand_sel: nand_sel {
+			function = "nand";
+			groups = "nand_0_3_grp",
+				 "nand_4_5_grp",
+				 "nand_6_7_grp";
+		};
+
+		uart_sel: uart_sel {
+			function = "uart";
+			groups = "uart_0_3_grp",
+				 "uart_4_5_grp",
+				 "uart_6_7_grp";
+		};
+
+		i2c_sel: i2c_sel {
+			function = "i2c";
+			groups = "i2c_6_7_grp";
+		};
 	};
 };
