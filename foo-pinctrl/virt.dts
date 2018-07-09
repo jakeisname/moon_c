@@ -402,7 +402,10 @@
 		reg = <0x0 0xf000e000 0x0 0x100>;	
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&nand_sel>;
+		pinctrl-0 = <&gpio_0_5_sel>,
+			    <&i2c_sel>,
+			    <&mfio_0_1_conf>,
+			    <&mfio_2_3_conf>;
 
 		gpio_sel: gpio_sel {
 			function = "gpio";
@@ -434,6 +437,19 @@
 		i2c_sel: i2c_sel {
 			function = "i2c";
 			groups = "i2c_6_7_grp";
+		};
+
+		mfio_0_1_conf: mfio_0_1_conf {
+			pins = "mfio_0",
+			       "mfio_1";
+			input-enable;
+			bias-pull-up;
+		};
+
+		mfio_2_3_conf: mfio_2_3_conf {
+			pins = "mfio_2",
+			       "mfio_3";
+			ouput-enable;
 		};
 	};
 };
