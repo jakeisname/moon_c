@@ -352,7 +352,7 @@ static int foo_pin_config_set(struct pinctrl_dev *pctrl_dev, unsigned int pin,
 			case PIN_CONFIG_OUTPUT_ENABLE:
 				drv_data->mode = 1;
 				dev_info(pctrl_dev->dev, 
-						"pin:%u set putput-enable\n", 
+						"pin:%u set output-enable\n", 
 						pin);
 				break;
 
@@ -452,7 +452,7 @@ static int foo_pinctrl_probe(struct platform_device *pdev)
 	pinctrl->pctrl_dev = pinctrl_register(&foo_pinctrl_desc, &pdev->dev,
 			pinctrl);
 	if (IS_ERR(pinctrl->pctrl_dev)) {
-		dev_err(&pdev->dev, "unable to register IOMUX pinctrl\n");
+		dev_err(&pdev->dev, "unable to register foo pinctrl\n");
 		return PTR_ERR(pinctrl->pctrl_dev);
 	}
 

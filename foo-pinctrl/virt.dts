@@ -389,14 +389,6 @@
 		interrupts = <0 33 0>;
 	};
 
-	foo4 {
-		compatible = "foo,foo4";
-		reg = <0x0 0xf000e000 0x0 0x100>;	
-		interrupts = <0 20 0>;	/* hwirq=20 + 32 */
-		my-prop-val32 = <0x12345678>;
-		my-prop-string = "test string";
-	};
-
 	foo-pinctrl {
 		compatible = "foo,foo-pinctrl";
 		reg = <0x0 0xf000e000 0x0 0x100>;	
