@@ -23,7 +23,7 @@
 
 
 struct foo_pinctrl {
-	struct pinctrl_dev *pctl;
+	struct pinctrl_dev *pctrl_dev;
 	struct device *dev;
 
 	/* here.... pinmux & pinconf register base, ... */
@@ -234,15 +234,7 @@ static int foo_get_function_groups(struct pinctrl_dev *pctrl_dev,
 	return 0;
 }
 
-static int foo_pinmux_set(struct foo_pinctrl *pinctrl,
-			  const struct foo_function *func,
-			  const struct foo_group *grp)
-{
-	dev_info(pinctrl->dev, "%s\n", __func__);
-	return 0;
-}
-
-static int foo_pinmux_enable(struct pinctrl_dev *pctrl_dev,
+static int foo_set_mux(struct pinctrl_dev *pctrl_dev,
 			     unsigned int func_select, unsigned int grp_select)
 {
 	struct foo_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
@@ -256,17 +248,17 @@ static int foo_pinmux_enable(struct pinctrl_dev *pctrl_dev,
 	func = &pinctrl->functions[func_select];
 	grp = &pinctrl->groups[grp_select];
 
-	dev_dbg(pctrl_dev->dev, "func:%u name:%s grp:%u name:%s\n",
+	dev_info(pctrl_dev->dev, "func:%u name:%s grp:%u name:%s\n",
 		func_select, func->name, grp_select, grp->name);
 
-	return foo_pinmux_set(pinctrl, func, grp);
+	return 0;
 }
 
 static const struct pinmux_ops foo_pinmux_ops = {
 	.get_functions_count = foo_get_functions_count,
 	.get_function_name = foo_get_function_name,
 	.get_function_groups = foo_get_function_groups,
-	.set_mux = foo_pinmux_enable,
+	.set_mux = foo_set_mux,
 };
 
 
@@ -287,94 +279,111 @@ static struct pinctrl_pin_desc foo_pins[] = {
 	PINCTRL_PIN(7, "mfio_7"),
 };
 
-static void foo_pin_get_pull(struct pinctrl_dev *pctrldev,
-			     unsigned int pin, bool *pull_up,
-			     bool *pull_down)
-{
-	struct foo_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrldev);
-	//struct foo_pin *pin_data = pctrldev->desc->pins[pin].drv_data;
+struct foo_pin_drv_data {
+	int bias;	/* 0=high-impedance, 1=pull-up, 2=pull-down */
+	int mode;	/* 0=input, 1=output */
+};
 
-	*pull_down = true;
-}
-
-static int foo_pin_config_get(struct pinctrl_dev *pctldev, unsigned int pin,
+static int foo_pin_config_get(struct pinctrl_dev *pctrl_dev, unsigned int pin,
 			      unsigned long *config)
 {
-	//struct foo_pin *pin_data = pctldev->desc->pins[pin].drv_data;
+	struct foo_pin_drv_data *drv_data = pctrl_dev->desc->pins[pin].drv_data;
 	enum pin_config_param param = pinconf_to_config_param(*config);
-	bool pull_up = 0, pull_down = 0;
-
-	//if (pin_data->pin_conf.base == -1)
-	//	return -ENOTSUPP;
 
 	switch (param) {
+		case PIN_CONFIG_INPUT_ENABLE:
+			dev_info(pctrl_dev->dev, 
+					"pin=%d, config=input-enable:%d\n",
+					pin, drv_data->mode);
+			break;
 
-	case PIN_CONFIG_BIAS_PULL_UP:
-		foo_pin_get_pull(pctldev, pin, &pull_up, &pull_down);
-		if (pull_up)
-			return 0;
-		else
-			return -EINVAL;
+		case PIN_CONFIG_OUTPUT_ENABLE:
+			dev_info(pctrl_dev->dev, 
+					"pin=%d, config=output-enable:%d\n",
+					pin, !drv_data->mode);
+			break;
 
-	case PIN_CONFIG_BIAS_PULL_DOWN:
-		foo_pin_get_pull(pctldev, pin, &pull_up, &pull_down);
-		if (pull_down)
-			return 0;
-		else
-			return -EINVAL;
+		case PIN_CONFIG_BIAS_HIGH_IMPEDANCE:
+			dev_info(pctrl_dev->dev, 
+					"pin=%d, config=bias-high-impedance:%d\n",
+					pin, drv_data->bias == 0);
+			break;
 
-	default:
-		return -ENOTSUPP;
+		case PIN_CONFIG_BIAS_PULL_UP:
+			dev_info(pctrl_dev->dev, 
+					"pin=%d, config=bias-pull-up:%d\n",
+					pin, drv_data->bias == 1);
+			break;
+
+		case PIN_CONFIG_BIAS_PULL_DOWN:
+			dev_info(pctrl_dev->dev, 
+					"pin=%d, config=bias-pull-down:%d\n",
+					pin, drv_data->bias == 1);
+			break;
+
+
+		default:
+			return -ENOTSUPP;
 	}
+
+	return 0; /* success */
 }
 
-static int foo_pin_set_pull(struct pinctrl_dev *pctrldev, unsigned int pin,
-			    bool pull_up, bool pull_down)
-{
-	struct foo_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrldev);
-	//struct foo_pin *pin_data = pctrldev->desc->pins[pin].drv_data;
-
-	dev_dbg(pctrldev->dev, "pin:%u set pullup:%d pulldown: %d\n",
-		pin, pull_up, pull_down);
-	return 0;
-}
-
-static int foo_pin_config_set(struct pinctrl_dev *pctrldev, unsigned int pin,
+static int foo_pin_config_set(struct pinctrl_dev *pctrl_dev, unsigned int pin,
 			      unsigned long *configs, unsigned int num_configs)
 {
-	//struct foo_pin *pin_data = pctrldev->desc->pins[pin].drv_data;
+	struct foo_pin_drv_data *drv_data = pctrl_dev->desc->pins[pin].drv_data;
 	enum pin_config_param param;
 	unsigned int i;
 	u32 arg;
-	int ret = -ENOTSUPP;
-
-	//if (pin_data->pin_conf.base == -1)
-	//	return -ENOTSUPP;
 
 	for (i = 0; i < num_configs; i++) {
 		param = pinconf_to_config_param(configs[i]);
 		arg = pinconf_to_config_argument(configs[i]);
 
 		switch (param) {
-		case PIN_CONFIG_BIAS_PULL_UP:
-			ret = foo_pin_set_pull(pctrldev, pin, true, false);
-			if (ret < 0)
-				goto out;
-			break;
+			case PIN_CONFIG_INPUT_ENABLE:
+				drv_data->mode = 0;
+				dev_info(pctrl_dev->dev, 
+						"pin:%u set input-enable\n", 
+						pin);
+				break;
 
-		case PIN_CONFIG_BIAS_PULL_DOWN:
-			ret = foo_pin_set_pull(pctrldev, pin, false, true);
-			if (ret < 0)
-				goto out;
-			break;
+			case PIN_CONFIG_OUTPUT_ENABLE:
+				drv_data->mode = 1;
+				dev_info(pctrl_dev->dev, 
+						"pin:%u set putput-enable\n", 
+						pin);
+				break;
+
+			case PIN_CONFIG_BIAS_HIGH_IMPEDANCE:
+				drv_data->bias = 0;
+				dev_info(pctrl_dev->dev, 
+						"pin:%u set bias-high-impedance\n", 
+						pin);
+				break;
+
+			case PIN_CONFIG_BIAS_PULL_UP:
+				drv_data->bias = 1;
+				dev_info(pctrl_dev->dev, 
+						"pin:%u set bias-pull-up\n", 
+						pin);
+				break;
+
+			case PIN_CONFIG_BIAS_PULL_DOWN:
+				drv_data->bias = 2;
+				dev_info(pctrl_dev->dev, 
+						"pin:%u set bias-pull-down\n", 
+						pin);
+				break;
 
 		default:
-			dev_err(pctrldev->dev, "invalid configuration\n");
+			dev_err(pctrl_dev->dev, "invalid configuration\n");
 			return -ENOTSUPP;
 		}
 	}
-out:
-	return ret;
+
+	return 0; /* success */
 }
 
 static const struct pinconf_ops foo_pinconf_ops = {
@@ -400,8 +409,13 @@ static struct pinctrl_desc foo_pinctrl_desc = {
 static int foo_pinctrl_probe(struct platform_device *pdev)
 {
 	struct foo_pinctrl *pinctrl;
+	struct foo_pin_drv_data *drv_data;
 	unsigned int num_pins = ARRAY_SIZE(foo_pins);
 	int i;
+
+	/*
+         * 1) allocate foo_pinctrl 
+         */
 
 	pinctrl = devm_kzalloc(&pdev->dev, sizeof(*pinctrl), GFP_KERNEL);
 	if (!pinctrl)
@@ -415,18 +429,31 @@ static int foo_pinctrl_probe(struct platform_device *pdev)
 	pinctrl->functions = foo_functions;
 	pinctrl->num_functions = ARRAY_SIZE(foo_functions);
 
-	for (i = 0; i < num_pins; i++) {                                        
-		foo_pins[i].drv_data = &foo_pins[i];                                
+	/* 
+	 * 2) allocate array of pin drv_data 
+	 */
+
+	for (i = 0; i < num_pins; i++) {
+		drv_data = devm_kzalloc(&pdev->dev, 
+				sizeof(struct foo_pin_drv_data), GFP_KERNEL);
+		if (!drv_data)
+			return -ENOMEM;
+
+		foo_pins[i].drv_data = (void *) drv_data;
 	}
+
+	/* 
+	 * 3) register pinctrl_desc 
+	 */
 
 	foo_pinctrl_desc.pins = foo_pins;
 	foo_pinctrl_desc.npins = num_pins;
 
-	pinctrl->pctl = pinctrl_register(&foo_pinctrl_desc, &pdev->dev,
+	pinctrl->pctrl_dev = pinctrl_register(&foo_pinctrl_desc, &pdev->dev,
 			pinctrl);
-	if (IS_ERR(pinctrl->pctl)) {
+	if (IS_ERR(pinctrl->pctrl_dev)) {
 		dev_err(&pdev->dev, "unable to register IOMUX pinctrl\n");
-		return PTR_ERR(pinctrl->pctl);
+		return PTR_ERR(pinctrl->pctrl_dev);
 	}
 
 	return 0;
