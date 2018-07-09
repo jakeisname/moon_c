@@ -62,6 +62,13 @@ static struct pinctrl_pin_desc foo_pins[] = {
 	PINCTRL_PIN(7, "mfio_7"),
 };
 
+
+/****************************************************************************
+ *
+ * groups 
+ *
+ ****************************************************************************/
+
 static const unsigned int gpio_0_3_pins[] = {0, 1, 2, 3};
 static const unsigned int nand_0_3_pins[] = {0, 1, 2, 3};
 static const unsigned int uart_0_3_pins[] = {0, 1, 2, 3};
@@ -72,13 +79,6 @@ static const unsigned int uart_4_5_pins[] = {4, 5};
 static const unsigned int nand_6_7_pins[] = {6, 7};
 static const unsigned int uart_6_7_pins[] = {6, 7};
 static const unsigned int i2c_6_7_pins[] = {6, 7};
-
-
-/****************************************************************************
- *
- * groups 
- *
- ****************************************************************************/
 
 static const struct foo_group foo_groups[] = {
 	{
@@ -129,13 +129,14 @@ static const struct foo_group foo_groups[] = {
  *
  ****************************************************************************/
 
-static const char * const gpio_grps[] = { "gpio_0_3_grp" };
+static const char * const gpio_grps[] = { "gpio_0_3_grp",
+	"gpio_4_5_grp", "gpio_6_7_grp" };
 
 static const char * const nand_grps[] = {
-	"nand_0_3_grp", "nand_4_5_grp", "nand_5_6_grp" };
+	"nand_0_3_grp", "nand_4_5_grp", "nand_6_7_grp" };
 
 static const char * const uart_grps[] = {
-	"uart_0_3_grp", "uart_4_5_grp", "uart_5_6_grp" };
+	"uart_0_3_grp", "uart_4_5_grp", "uart_6_7_grp" };
 
 static const char * const i2c_grps[] = {
 	"i2c_6_7_grp" };
