@@ -394,10 +394,8 @@
 		reg = <0x0 0xf000e000 0x0 0x100>;	
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&gpio_0_5_sel>,
-			    <&i2c_sel>,
-			    <&mfio_0_1_conf>,
-			    <&mfio_2_3_conf>;
+		pinctrl-0 = <&gpio_0_5_sel &i2c_sel
+			    &mfio_0_1_conf &mfio_2_3_conf>;
 
 		gpio_sel: gpio_sel {
 			function = "gpio";
