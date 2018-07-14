@@ -406,9 +406,16 @@ static struct pinctrl_desc foo_pinctrl_desc = {
 	.confops = &foo_pinconf_ops,
 };
 
+static struct foo_pinctrl my_pinctrl = {
+	.groups = foo_groups;
+	.num_groups = ARRAY_SIZE(foo_groups);
+	.functions = foo_functions;
+	.num_functions = ARRAY_SIZE(foo_functions);
+};
+
 static int foo_pinctrl_probe(struct platform_device *pdev)
 {
-	struct foo_pinctrl *pinctrl;
+	struct foo_pinctrl *pinctrl = &my_pinctrl;
 	struct foo_pin_drv_data *drv_data;
 	unsigned int num_pins = ARRAY_SIZE(foo_pins);
 	int i;
@@ -417,18 +424,21 @@ static int foo_pinctrl_probe(struct platform_device *pdev)
          * 1) allocate foo_pinctrl 
          */
 
+#if 0
 	pinctrl = devm_kzalloc(&pdev->dev, sizeof(*pinctrl), GFP_KERNEL);
 	if (!pinctrl)
 		return -ENOMEM;
+#endif
 
 	pinctrl->dev = &pdev->dev;
 	platform_set_drvdata(pdev, pinctrl);
 
+#if 0
 	pinctrl->groups = foo_groups;
 	pinctrl->num_groups = ARRAY_SIZE(foo_groups);
 	pinctrl->functions = foo_functions;
 	pinctrl->num_functions = ARRAY_SIZE(foo_functions);
-
+#endif
 	/* 
 	 * 2) allocate array of pin drv_data 
 	 */
