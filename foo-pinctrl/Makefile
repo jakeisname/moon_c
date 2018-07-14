@@ -1,4 +1,4 @@
-obj-m := foo-pinctrl.o
+obj-m := foo-pinctrl.o foo-pinctrl2.o
 
 #KDIR := 4.14.37-g744dfee
 #KDIR := /lib/modules/$(shell uname -r)/build
