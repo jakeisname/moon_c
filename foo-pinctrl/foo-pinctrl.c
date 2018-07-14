@@ -407,10 +407,10 @@ static struct pinctrl_desc foo_pinctrl_desc = {
 };
 
 static struct foo_pinctrl my_pinctrl = {
-	.groups = foo_groups;
-	.num_groups = ARRAY_SIZE(foo_groups);
-	.functions = foo_functions;
-	.num_functions = ARRAY_SIZE(foo_functions);
+	.groups = foo_groups,
+	.num_groups = ARRAY_SIZE(foo_groups),
+	.functions = foo_functions,
+	.num_functions = ARRAY_SIZE(foo_functions),
 };
 
 static int foo_pinctrl_probe(struct platform_device *pdev)
