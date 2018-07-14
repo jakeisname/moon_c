@@ -469,6 +469,16 @@ static int foo_pinctrl_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static int foo_pinctrl_remove(struct platform_device *pdev)
+{
+	struct foo_pinctrl *pinctrl = platform_get_drvdata(pdev);
+
+	pinctrl_unregister(pinctrl->pctrl_dev);
+
+	return 0;
+}
+
+
 static const struct of_device_id foo_pinctrl_of_match[] = {
 	{.compatible = "foo,foo-pinctrl"},
 	{ }
@@ -481,6 +491,7 @@ static struct platform_driver foo_pinctrl_driver = {
 		.name = "foo-pinctrl",
 		.of_match_table = foo_pinctrl_of_match,
 	},
+	.remove = foo_pinctrl_remove,
 };
 module_platform_driver(foo_pinctrl_driver);
 MODULE_LICENSE("GPL");
