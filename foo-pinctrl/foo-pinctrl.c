@@ -318,7 +318,7 @@ static int foo_pin_config_get(struct pinctrl_dev *pctrl_dev, unsigned int pin,
 		case PIN_CONFIG_BIAS_PULL_DOWN:
 			dev_info(pctrl_dev->dev, 
 					"pin=%d, config=bias-pull-down:%d\n",
-					pin, drv_data->bias == 1);
+					pin, drv_data->bias == 2);
 			break;
 
 
