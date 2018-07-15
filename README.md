@@ -47,6 +47,8 @@ http://jake.dothome.co.kr
     - pinctrl 플랫폼 드라이버에 8개의 pin, 4개의 function 및 다수의 그룹 등록
     - 디바이스 트리를 사용하여 pinmux/pinconf 매핑 사용
     - pictrl 드라이버가 로딩되면서 디폴트 pinmux/pinconf 매핑 동작
+  - foo-pinctrl2.c 
+    - foo-pinctrl.c를 구현만 약간 변형한 버전 (동일한 기능)      
   - virt.dts
     - qemu용 default virt 디바이스 트리에 foo-pinctrl 노드를 추가 (foo-pinctrl.c와 연동)
 
