@@ -56,8 +56,13 @@ http://jake.dothome.co.kr
 * foo-gpio 디렉토리
   - gpio.c        
     - gpio 컨트롤러에 legacy 인터럽트 연동 샘플
+  - gpio2.c        
+    - gpio 컨트롤러에 legacy 인터럽트 연동 샘플-2 
+    - 디바이스트리에서 다수의 gpio controller 드라이버 지정 가능
+    - 가상 gpio 레지스터 시뮬레이션    
+- virt.dts
+    - gpio2용 gpio0 & gpio1 노드 추가
   
-
 * foo-gpio-pci 디렉토리
   - gpio.c        
     - pci 플랫폼 드라이버에 gpio 컨트롤러를 연동하고 legacy 인터럽트 연동 샘플
@@ -80,3 +85,7 @@ http://jake.dothome.co.kr
   - test3.c       
     - foo3.c 이벤트 수신 application
 
+* hrtimer 디렉토리
+  - foo.c
+    - pinned hrtimer를 테스트하기 위해 각각의 cpu에서 1초 주기로 hrtimer를 동작
+  
