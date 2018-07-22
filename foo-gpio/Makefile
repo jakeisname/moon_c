@@ -1,5 +1,4 @@
-obj-m := foo.o
-foo-objs := gpio.o
+obj-m := gpio.c gpio2.c
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
