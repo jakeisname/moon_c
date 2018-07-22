@@ -18,11 +18,18 @@ MODULE_LICENSE("GPL");
 
 #define DRV_NAME "foo"
 
+struct foo_regs {
+	unsigned int reg_dat;	/* gpio value */
+	unsigned int reg_set;	/* set bit when write gpio value=1 */
+	unsigned int reg_clr;	/* set bit when write gpio value=0 */
+	unsigned int reg_dir;	/* gpio direction 0=input, 1=output */
+};
+
 struct foo_gpio {
-	struct device *dev;
-	void __iomem *base;
-	raw_spinlock_t lock;
-	struct gpio_chip gc;
+	struct device		*dev;
+	raw_spinlock_t		lock;
+	struct gpio_chip	gc;
+	struct foo_regs		regs;
 
 	bool pinmux_is_supported;
 	struct pinctrl_dev *pctl;
@@ -71,6 +78,20 @@ static void foo_gpio_free(struct gpio_chip *gc, unsigned offset)
 	pinctrl_free_gpio(gpio);
 }
 
+static void _set_gpio_data(struct foo_gpio *chip, int offset, int value)
+{
+	if (value) {
+		chip->regs.reg_dat |= (1 << offset);
+		chip->regs.reg_set |= (1 << offset);
+		chip->regs.reg_clr &= ~(1 << offset);
+	}
+	else {
+		chip->regs.reg_dat &= ~(1 << offset);
+		chip->regs.reg_set &= ~(1 << offset);
+		chip->regs.reg_clr |= (1 << offset);
+	}
+}
+
 static int foo_gpio_direction_output(struct gpio_chip *gc, 
 	unsigned offset, int val)
 {
@@ -80,7 +101,9 @@ static int foo_gpio_direction_output(struct gpio_chip *gc,
 
 	raw_spin_lock_irqsave(&chip->lock, flags);
 	printk(KERN_INFO "%s offset=%u, gpio=%u, val=%d\n", 
-		__func__, offset, gpio, val);
+		__func__, offset, gpio, !!val);
+	chip->regs.reg_dir |= (1 << offset);
+	_set_gpio_data(chip, offset, val);
 	raw_spin_unlock_irqrestore(&chip->lock, flags);
 
 	return 0;
@@ -94,19 +117,24 @@ static int foo_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
 
 	raw_spin_lock_irqsave(&chip->lock, flags);
 	printk(KERN_INFO "%s offset=%u, gpio=%u\n", __func__, offset, gpio);
+	chip->regs.reg_dir &= ~(1 << offset);
 	raw_spin_unlock_irqrestore(&chip->lock, flags);
 
 	return 0;
 }
 
-static int foo_val[512] = { 0,  };
-
 static int foo_gpio_get(struct gpio_chip *gc, unsigned offset)
 {
-	int val = foo_val[offset];
+	struct foo_gpio *chip = foo_gpiochip_get_data(gc);
 	unsigned gpio = gc->base + offset;
+	unsigned long flags;
+	int val;
+
+	raw_spin_lock_irqsave(&chip->lock, flags);
+	val = !!(chip->regs.reg_dat & (1 << offset));
 	printk(KERN_INFO "%s offset=%u, gpio=%u, val=%d\n", 
-		__func__, offset, gpio, val);
+			__func__, offset, gpio, val);
+	raw_spin_unlock_irqrestore(&chip->lock, flags);
 	return val;
 }
 
@@ -116,8 +144,8 @@ static void foo_gpio_set(struct gpio_chip *gc, unsigned offset, int val)
 	unsigned gpio = gc->base + offset;
 	unsigned long flags;
 
-	foo_val[offset] = val;
 	raw_spin_lock_irqsave(&chip->lock, flags);
+	_set_gpio_data(chip, offset, val);
 	printk(KERN_INFO "%s offset=%u, gpio=%u, val=%d\n", 
 		__func__, offset, gpio, val);
 	raw_spin_unlock_irqrestore(&chip->lock, flags);
@@ -128,8 +156,6 @@ static void foo_gpio_set(struct gpio_chip *gc, unsigned offset, int val)
  * 2) irq_chip
  *****************************************************************/
 
-int foo_count = 0;
-
 static void foo_parent_gpio_irq_handler(struct irq_desc *desc)
 {
 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
@@ -137,7 +163,6 @@ static void foo_parent_gpio_irq_handler(struct irq_desc *desc)
 	unsigned pin = 0;
 	int child_irq = 0;
 
-	foo_count++;
 	chained_irq_enter(irq_chip, desc);
 
 	child_irq = irq_find_mapping(gc->irqdomain, pin);
@@ -216,15 +241,17 @@ static int foo_gpio_probe(struct platform_device *pdev)
 	struct foo_gpio *chip;
 	struct gpio_chip *gc;
 	u32 ngpios;
-	int parent_irq = 42;
+	int parent_irq;
 	int ret;
 
 	printk(KERN_INFO "%s\n", __func__);
 
-#if 0
 	if (!of_device_is_compatible(dev->of_node, "foo,foo-gpio"))
 		return -ENOMEM;
-#endif
+
+        chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
+        if (!chip)
+                return -ENOMEM;
 
 	chip->dev = dev;
 	platform_set_drvdata(pdev, chip);
@@ -234,8 +261,14 @@ static int foo_gpio_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	printk(KERN_INFO "%s ngpios=%d\n", __func__, ngpios);
-return 0;
+	parent_irq = platform_get_irq(pdev, 0);
+	if (parent_irq < 0) {
+		dev_err(&pdev->dev, "Failed to get irq\n");
+		return -ENODEV;
+	}
+
+	printk(KERN_INFO "%s ngpios=%d, parent_hwirq=%d\n", 
+			__func__, ngpios, parent_irq);
 
 	raw_spin_lock_init(&chip->lock);
 
@@ -272,7 +305,7 @@ return 0;
 		ret = foo_gpio_register_pinconf(chip);
 		if (ret) {
 			dev_err(dev, "unable to register pinconf\n");
-			goto err_rm_gpiochip;
+			return ret;
 		}
 
 		if (pinconf_disable_mask) {
@@ -281,7 +314,7 @@ return 0;
 			if (ret) {
 				dev_err(dev,
 				    "unable to create pinconf disable map\n");
-				goto err_rm_gpiochip;
+				return ret;
 			}
 		}
 	}
@@ -293,32 +326,21 @@ return 0;
 			handle_simple_irq, IRQ_TYPE_NONE);
 	if (ret) {
 		dev_err(dev, "no GPIO irqchip\n");
-		goto err_rm_gpiochip;
+		return ret;
 	}
 
-	parent_irq = platform_get_irq(pdev, 0);
 	gpiochip_set_chained_irqchip(gc, &foo_gpio_irq_chip, parent_irq,
 			foo_parent_gpio_irq_handler);
 
-	printk(KERN_INFO "%s successed. chip=%p, parent_irq=%d\n", 
-		__func__, chip, parent_irq);
+	printk(KERN_INFO "%s successed. chip=%p\n", 
+		__func__, chip);
 
 	return 0;
-
-err_rm_gpiochip:
-	platform_set_drvdata(pdev, NULL);
-
-	return ret;
 }
 
 static int foo_gpio_remove(struct platform_device *pdev)
 {
-	struct foo_gpio *chip = platform_get_drvdata(pdev);
-	
 	platform_set_drvdata(pdev, NULL);
-
-	printk(KERN_INFO "%s chip=%p, foo_count=%d\n",
-		 __func__, chip, foo_count);
 
 	return 0;
 }
