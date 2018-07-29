@@ -9,6 +9,8 @@ KDIR := /lib/modules/4.14.37-g744dfee/build
 
 all:
 	make -C ${KDIR} M=$(PWD) modules
+	gcc test.c -o test
 
 clean:
 	make -C ${KDIR} M=$(PWD) clean
+	rm -f test

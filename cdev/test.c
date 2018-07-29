@@ -24,7 +24,7 @@ int main( int argc, char ** argv)
 
 	fd = open(DEV_FILE, O_RDWR);
 	if (fd < 0) {
-		printf("open %s failed. err=%d", DEV_FILE, fd);
+		printf("open %s failed. err=%d\n", DEV_FILE, fd);
 		exit(1);
 	}
 

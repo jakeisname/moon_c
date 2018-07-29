@@ -18,10 +18,23 @@
 #define MINOR_NUM	0
 
 struct foo_device { 
-	struct cdev chardev;
+	struct cdev cdev;
+	dev_t devt;
+	int count;
+	int major;
+	int minor;
 };                                                                              
 
-static struct foo_data _foo_data;
+static struct foo_device  _foo_device = {
+	.major = MAJOR_NUM,
+	.minor = MINOR_NUM,
+	.count = 1,
+};
+
+static struct foo_data _foo_data = {
+	.a = 1,
+	.b = 2,
+};
 
 
 /****************************
@@ -33,6 +46,7 @@ static long foo_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	struct foo_device *foo = filp->private_data;                          
 	void __user *ip = (void __user *) arg;
 
+	printk(KERN_INFO "%s: cmd=0x%08x\n", __func__, cmd);
 	if (!foo)                                                              
 		return -ENODEV;                                                 
 
@@ -50,7 +64,8 @@ static long foo_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				return -EFAULT;
 			break;
 		default:
-			printk("%s: undefined ioctl. cmd=%d\n", __func__, cmd);
+			printk(KERN_INFO "%s: undefined ioctl. cmd=%d\n", 
+					__func__, cmd);
 			break;
 	}
 
@@ -60,7 +75,7 @@ static long foo_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 static int foo_open(struct inode *inode, struct file *filp)
 {
 	struct foo_device *foo = container_of(inode->i_cdev,                  
-			struct foo_device, chardev);      
+			struct foo_device, cdev);      
 
 	printk("%s\n", __func__);
 
@@ -91,27 +106,18 @@ static const struct file_operations foo_ops = {
 
 static int __init foo_init(void)
 {
-	struct foo_device *foo;
-	dev_t devt;
-	int count = 1;
-	int major = MAJOR_NUM;
-	int minor = MINOR_NUM;
+	struct foo_device *foo = &_foo_device;
 	int ret;
 
 	printk(KERN_INFO "%s: Try to load module.\n", __func__);
 
-       	foo = kzalloc(sizeof(struct foo_device), GFP_KERNEL);
-	if (!foo) {
-		printk(KERN_ERR "%s: allocation failed.\n", __func__);
-		return -ENOMEM;
-	}
-
-	if (major) {
-		devt = MKDEV(MAJOR_NUM, MINOR_NUM);
-		ret  = register_chrdev_region(devt, count, "foo");
+	if (foo->major) {
+		foo->devt = MKDEV(foo->major, foo->minor);
+		ret  = register_chrdev_region(foo->devt, foo->count, "foo");
 	} else {
-		ret = alloc_chrdev_region(&devt, MINOR_NUM, count, "foo");
-		major = MAJOR(devt); 
+		ret = alloc_chrdev_region(&foo->devt, foo->minor, 
+				foo->count, "foo");
+		foo->major = MAJOR(foo->devt); 
 	}
 	if (ret < 0) {
 		printk(KERN_ERR "%s: alloc chardev region failed. ret=%d\n", 
@@ -119,26 +125,34 @@ static int __init foo_init(void)
 		return -ENODEV;
 	}
 
-	cdev_init(&foo->chardev, &foo_ops);
-	foo->chardev.owner = THIS_MODULE;
-	foo->chardev.ops = &foo_ops;
+	cdev_init(&foo->cdev, &foo_ops);
+	foo->cdev.owner = THIS_MODULE;
+	foo->cdev.ops = &foo_ops;
 
-	ret = cdev_add(&foo->chardev, devt, count);
+	ret = cdev_add(&foo->cdev, foo->devt, foo->count);
 	if (ret < 0) {
 		printk(KERN_ERR "%s: cdev_add() failed. ret=%d\n", 
 				__func__, ret);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto err;
 	}
 
 	printk(KERN_INFO "%s: Load module successed. major=%d, minor=%d\n", 
-			__func__, major, minor);
+			__func__, foo->major, foo->minor);
 
 	return 0;
+err:
+	unregister_chrdev_region(foo->devt, foo->count);
+
+	return ret;
 }
 
 static void __exit foo_exit(void)
 {
-	// cdev_device_del(&foo->chrdev, &gdev->dev);
+	struct foo_device *foo = &_foo_device;
+
+	cdev_del(&foo->cdev);
+	unregister_chrdev_region(foo->devt, foo->count);
 
 	printk("%s: module unloaded\n", __func__);
 }
