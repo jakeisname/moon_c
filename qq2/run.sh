@@ -17,7 +17,7 @@ qemu-system-aarch64 -smp 2 -m 1024 -cpu cortex-a57 -nographic \
 	-kernel ${KERNEL_IMG} ${DTB} \
 	-nographic \
 	-device virtio-net-device,netdev=mynet1 \
-	-netdev tap,id=mynet1,ifname=tap0,br=${BR},script=no,downscript=no \
+	-netdev tap,id=mynet1,ifname=tap0,script=no,downscript=no \
 	-device virtio-blk-device,drive=disk \
 	-drive if=sd,id=disk,format=raw,file=${ROOTFS} \
 	-append 'root=/dev/vda rw rootwait mem=1024M console=ttyAMA0,38400n8'
@@ -26,4 +26,6 @@ if [ "$1" == "dumpdtb" ]; then
 dtc -I dtb -O dts virt_original.dtb -o virt_original.dts
 fi
 #reset
+exit
 	#-dtb ${DTB_FILE} \
+	-netdev tap,id=mynet1,ifname=tap0,br=${BR},script=no,downscript=no \

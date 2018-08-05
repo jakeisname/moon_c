@@ -3,8 +3,8 @@
 
 dd if=/dev/zero of=rootfs.ext4 bs=1M count=4000
 mkfs.ext4 -F rootfs.ext4
-sudo mount rootfs.ext4 mnt1 -o loop
-cd mnt1
+sudo mount rootfs.ext4 mnt -o loop
+cd mnt
 sudo rm -rf lost+found
 sudo tar xf ../$1 
 
@@ -14,5 +14,5 @@ if [ -d binary ]; then
 fi 
 
 cd ..
-sudo umount mnt1
+sudo umount mnt
 
