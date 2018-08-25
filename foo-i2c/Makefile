@@ -1,4 +1,4 @@
-obj-m := foo.o
+obj-m := foo-i2c.o
 
 #KDIR := 4.14.37-g744dfee
 KDIR := /lib/modules/$(shell uname -r)/build
@@ -9,8 +9,6 @@ KDIR := /lib/modules/$(shell uname -r)/build
 
 all:
 	make -C ${KDIR} M=$(PWD) modules
-	gcc test.c -o test
 
 clean:
 	make -C ${KDIR} M=$(PWD) clean
-	rm -f test
