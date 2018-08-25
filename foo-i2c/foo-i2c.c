@@ -38,10 +38,10 @@ static int foo_i2c_xfer_single_msg(struct foo_i2c_dev *foo_i2c,
 
 	if (msg->flags & I2C_M_RD) {
 		for (i = 0; i < msg->len; i++) {
-			msg->buf[i] = addr & 0xff;
+			msg->buf[i] = (addr & 0xff) >> 1;
 
 			/* receive from fifo */
-			dev_info(foo_i2c->device, "read=0x%02x\n", val);
+			dev_info(foo_i2c->device, "read=0x%02x\n", msg->buf[i]);
 		}
 	}
 
