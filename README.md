@@ -89,3 +89,6 @@ http://jake.dothome.co.kr
   - foo.c
     - pinned hrtimer를 테스트하기 위해 각각의 cpu에서 1초 주기로 hrtimer를 동작
   
+* foo-i2c 디렉토리
+  - foo-i2c.c
+    - i2c host controller 에뮬레이션 샘플
