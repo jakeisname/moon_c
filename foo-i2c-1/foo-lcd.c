@@ -4,7 +4,9 @@
 #include <linux/err.h>
 #include <linux/kernel.h>
 
-static const unsigned short normal_i2c[] = { 0x4f, I2C_CLIENT_END };
+#define	FOO_LCD_ADDR	0x3f
+
+static const unsigned short normal_i2c[] = { FOO_LCD_ADDR, I2C_CLIENT_END };
 
 #define DRVNAME			"foo_lcd"
 
@@ -82,19 +84,22 @@ foo_lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	int ctrl;
 	int err;
 
+	dev_info(dev, "%s(%d): try to probe\n", __func__, __LINE__);
+
 	data = devm_kzalloc(dev, sizeof(struct foo_lcd), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
-
-	data->client = client;
 
 	ctrl = i2c_smbus_read_byte_data(client, 0x0);
 	if (ctrl < 0)
 		return ctrl;
 
+	data->client = client;
+	dev_set_drvdata(&client->dev, data);
+
 #if 0
 	memset(&info, 0, sizeof(info));
-	info.addr = 0x4f;
+	info.addr = FOO_LCD_ADDR;
 	i2c_new_device(adapter, &info);
 #else
 
@@ -103,13 +108,13 @@ foo_lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
                 return -ENODEV;
 #endif
 
-	dev_info(dev, "backlight '%s'\n", client->name);
+	dev_info(dev, "%s(%d): probed. name=%s\n", __func__, __LINE__, client->name);
 
 	return 0;
 }
 
 static const struct i2c_device_id foo_lcd_ids[] = {
-	{ "foo_lcd", 0 },
+	{ DRVNAME, 0 },
 	{ /* LIST END */ }
 };
 MODULE_DEVICE_TABLE(i2c, foo_lcd_ids);
@@ -120,6 +125,8 @@ static int foo_lcd_detect(struct i2c_client *new_client,
 	struct i2c_adapter *adapter = new_client->adapter;
 	int ctrl;
 
+	dev_info(&new_client->dev, "%s(%d): try to detect.\n", __func__, __LINE__);
+
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
 		return -ENODEV;
 
@@ -127,7 +134,9 @@ static int foo_lcd_detect(struct i2c_client *new_client,
 	if (ctrl < 0)
 		return -ENODEV;
 
-	strlcpy(info->type, "foo_lcd", I2C_NAME_SIZE);
+	dev_info(&new_client->dev, "%s(%d): detected\n", __func__, __LINE__);
+
+	strlcpy(info->type, DRVNAME, I2C_NAME_SIZE);
 
 	return 0;
 }
@@ -135,7 +144,7 @@ static int foo_lcd_detect(struct i2c_client *new_client,
 static struct i2c_driver foo_lcd_driver = {
 	.class		= I2C_CLASS_DEPRECATED,
 	.driver = {
-		.name	= "foo_lcd",
+		.name	= DRVNAME, 
 	},
 	.probe		= foo_lcd_probe,
 	.id_table	= foo_lcd_ids,
