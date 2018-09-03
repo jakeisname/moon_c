@@ -141,12 +141,21 @@ static int foo_lcd_detect(struct i2c_client *new_client,
 	return 0;
 }
 
+static int foo_lcd_remove(struct i2c_client *client)
+{
+	dev_info(&client->dev, "%s(%d): remove.\n", __func__, __LINE__);
+
+	sysfs_remove_group(&client->dev.kobj, &foo_lcd_group);
+	return 0;
+}
+
 static struct i2c_driver foo_lcd_driver = {
 	.class		= I2C_CLASS_DEPRECATED,
 	.driver = {
 		.name	= DRVNAME, 
 	},
 	.probe		= foo_lcd_probe,
+	.remove		= foo_lcd_remove,
 	.id_table	= foo_lcd_ids,
 	.detect		= foo_lcd_detect,
 	.address_list	= normal_i2c,
