@@ -92,3 +92,8 @@ http://jake.dothome.co.kr
 * foo-i2c 디렉토리
   - foo-i2c.c
     - i2c host controller 에뮬레이션 샘플
+
+* foo-i2c-1 디렉토리
+  - foo-lcd.c
+    - i2c client 에뮬레이션 샘플
+    - 0x3f 주소를 갖는 1602-LCD-I2C(16x2)의 백라이트를 제어
