@@ -27,7 +27,7 @@ static ssize_t set_backlight(struct device *dev, struct device_attribute *da,
 	if (err)
 		status = 0;
 
-	unsigned char value = status ? 0x0F : 0x40;	/* on/off */
+	unsigned char value = status ? 0x0F : 0x08;	/* on/off */
 	unsigned char command = 0x00;
 
 	/* Write value */
