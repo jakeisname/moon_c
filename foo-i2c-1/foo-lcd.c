@@ -100,7 +100,6 @@ static int foo_lcd_detect(struct i2c_client *new_client,
 			struct i2c_board_info *info)
 {
 	int err;
-	struct i2c_adapter *adapter = new_client->adapter;
 
 	err = foo_lcd_detect_ex(new_client);
 	if (!err)
@@ -114,7 +113,6 @@ static int foo_lcd_probe(struct i2c_client *client,
 {
 	struct device *dev = &client->dev;
 	struct foo_lcd *data;
-	struct i2c_adapter *adapter = client->adapter;
 	int err;
 
 	dev_info(dev, "%s(%d): try to probe\n", __func__, __LINE__);
