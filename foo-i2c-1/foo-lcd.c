@@ -22,13 +22,15 @@ static ssize_t set_backlight(struct device *dev, struct device_attribute *da,
 	struct foo_lcd *data = dev_get_drvdata(dev);
 	int err;
 	int status;
+	unsigned char value;
+	unsigned char command;
 
 	err = kstrtoint(buf, 9, &status);
 	if (err)
 		status = 0;
 
-	unsigned char value = status ? 0x0F : 0x08;	/* on/off */
-	unsigned char command = 0x00;
+	value = status ? 0x0F : 0x08;	/* on/off */
+	command = 0x00;
 
 	/* Write value */
 	err = i2c_smbus_write_byte_data(data->client, command, value);
@@ -74,14 +76,45 @@ static struct attribute_group foo_lcd_group = {
 
 /*-----------------------------------------------------------------------*/
 
-static int
-foo_lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int foo_lcd_detect_ex(struct i2c_client *new_client)
+{
+	struct i2c_adapter *adapter = new_client->adapter;
+	int err;
+
+	dev_info(&new_client->dev, "%s(%d): try to detect.\n", 
+			__func__, __LINE__);
+
+	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
+		return -ENODEV;
+
+	err = i2c_smbus_read_byte_data(new_client, 0x0);
+	if (err < 0)
+		return -ENODEV;
+
+	dev_info(&new_client->dev, "%s(%d): detected\n", __func__, __LINE__);
+
+	return 0;
+}
+
+static int foo_lcd_detect(struct i2c_client *new_client,
+			struct i2c_board_info *info)
+{
+	int err;
+	struct i2c_adapter *adapter = new_client->adapter;
+
+	err = foo_lcd_detect_ex(new_client);
+	if (!err)
+		strlcpy(info->type, DRVNAME, I2C_NAME_SIZE);
+
+	return err;
+}
+
+static int foo_lcd_probe(struct i2c_client *client, 
+		const struct i2c_device_id *id)
 {
 	struct device *dev = &client->dev;
 	struct foo_lcd *data;
 	struct i2c_adapter *adapter = client->adapter;
-	struct i2c_board_info info;
-	int ctrl;
 	int err;
 
 	dev_info(dev, "%s(%d): try to probe\n", __func__, __LINE__);
@@ -90,53 +123,19 @@ foo_lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	if (!data)
 		return -ENOMEM;
 
-	ctrl = i2c_smbus_read_byte_data(client, 0x0);
-	if (ctrl < 0)
-		return ctrl;
+	err = foo_lcd_detect_ex(client);
+	if (err < 0)
+		return -ENODEV;
 
 	data->client = client;
 	dev_set_drvdata(&client->dev, data);
 
-#if 0
-	memset(&info, 0, sizeof(info));
-	info.addr = FOO_LCD_ADDR;
-	i2c_new_device(adapter, &info);
-#else
-
         err = sysfs_create_group(&client->dev.kobj, &foo_lcd_group);
         if (err)
                 return -ENODEV;
-#endif
 
-	dev_info(dev, "%s(%d): probed. name=%s\n", __func__, __LINE__, client->name);
-
-	return 0;
-}
-
-static const struct i2c_device_id foo_lcd_ids[] = {
-	{ DRVNAME, 0 },
-	{ /* LIST END */ }
-};
-MODULE_DEVICE_TABLE(i2c, foo_lcd_ids);
-
-static int foo_lcd_detect(struct i2c_client *new_client,
-			struct i2c_board_info *info)
-{
-	struct i2c_adapter *adapter = new_client->adapter;
-	int ctrl;
-
-	dev_info(&new_client->dev, "%s(%d): try to detect.\n", __func__, __LINE__);
-
-	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
-		return -ENODEV;
-
-	ctrl = i2c_smbus_read_byte_data(new_client, 0x0);
-	if (ctrl < 0)
-		return -ENODEV;
-
-	dev_info(&new_client->dev, "%s(%d): detected\n", __func__, __LINE__);
-
-	strlcpy(info->type, DRVNAME, I2C_NAME_SIZE);
+	dev_info(dev, "%s(%d): probed. name=%s\n", 
+			__func__, __LINE__, client->name);
 
 	return 0;
 }
@@ -146,13 +145,28 @@ static int foo_lcd_remove(struct i2c_client *client)
 	dev_info(&client->dev, "%s(%d): remove.\n", __func__, __LINE__);
 
 	sysfs_remove_group(&client->dev.kobj, &foo_lcd_group);
+
 	return 0;
 }
+
+#ifdef CONFIG_OF
+static const struct of_device_id foo_lcd_of_match[] = {
+        { .compatible = "foo,foo_lcd" },
+	{ }
+};
+#endif
+
+static const struct i2c_device_id foo_lcd_ids[] = {
+	{ DRVNAME, 0 },
+	{ /* LIST END */ }
+};
+MODULE_DEVICE_TABLE(i2c, foo_lcd_ids);
 
 static struct i2c_driver foo_lcd_driver = {
 	.class		= I2C_CLASS_DEPRECATED,
 	.driver = {
 		.name	= DRVNAME, 
+		.of_match_table = of_match_ptr(foo_lcd_of_match),
 	},
 	.probe		= foo_lcd_probe,
 	.remove		= foo_lcd_remove,
