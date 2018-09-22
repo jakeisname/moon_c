@@ -9,6 +9,7 @@
 static const unsigned short normal_i2c[] = { FOO_LCD_ADDR, I2C_CLIENT_END };
 
 #define DRVNAME			"foo_lcd"
+#define DEVNAME			"foo_lcd1"
 
 struct foo_lcd {
 	struct i2c_client *client;
@@ -155,7 +156,7 @@ static const struct of_device_id foo_lcd_of_match[] = {
 #endif
 
 static const struct i2c_device_id foo_lcd_ids[] = {
-	{ DRVNAME, 0 },
+	{ DEVNAME, 0 },
 	{ /* LIST END */ }
 };
 MODULE_DEVICE_TABLE(i2c, foo_lcd_ids);
