@@ -83,15 +83,16 @@ int main(int argc, char** argv)
 			continue;
 		}
 
-#if 0
+#if 1
 		/* Attempt to receive recvLine from the server */
-		if ( (recvlen = recvfrom(sockfd, recvLine, MAXLINE, 0, NULL, NULL))
-				== -1) {
+		// if ( (recvlen = recvfrom(sockfd, recvLine, MAXLINE, 0, NULL, NULL))
+		if ((recvlen = recv(sockfd, recvLine, 12, 0)) == -1) {
 			printf("Error in receiving.\n");
 		}
 
 		recvLine[recvlen] = '\0';
 		fputs(recvLine, stdout);
+		printf("len=%d\n", recvlen);
 #endif
 	}
 	/*                                                                          */

@@ -20,12 +20,16 @@ char *toUpper(char *);
 #define SOCK_FILE "/tmp/test_socket"
 
 static int read_from_client(int filedes);
+int write_to_client();
+int disconnect(int peer);
+
+static fd_set read_fds, write_fds;	// temp file descriptors list for select()
+static fd_set active_fds;
+static int sockfd;			// socket descriptor
+int peerfd;
 
 int main(int argc, char **argv)
 {
-	fd_set read_fds, write_fds;	// temp file descriptors list for select()
-	fd_set active_fds;
-	int sockfd;			// socket descriptor
 	struct sockaddr_un srv, cli_addr;
 	int nbytes;
 	int size;
@@ -34,7 +38,7 @@ int main(int argc, char **argv)
 	int n;
 	int i;
 	int len;
-	int peerfd;
+	int maxfd;
 
 	unlink(SOCK_FILE);
 
@@ -68,20 +72,21 @@ int main(int argc, char **argv)
 	}
 	printf("listen() successed.\n");
 
+	maxfd = sockfd;
 	FD_ZERO(&active_fds);
 	FD_SET(sockfd, &active_fds);
 
 	while (1) {
 		read_fds = active_fds;
 
-		printf("try to master select()\n");
-		n = select(sockfd+1, &read_fds, 0, 0, 0);
+		// printf("try to master select()\n");
+		n = select(maxfd+1, &read_fds, 0, 0, 0);
 		if (n < 0) {
 			perror("ERROR Server : select()\n");
 			close(sockfd);
 			exit(1);
 		}
-		printf("select() successed. n=%d. FDS=%d\n", n, FD_SETSIZE);
+		// printf("select() successed. n=%d. FDS=%d\n", n, FD_SETSIZE);
 
 		for (i = 0; i < FD_SETSIZE; i++) {
 			if (FD_ISSET(i, &read_fds)) {
@@ -99,14 +104,20 @@ int main(int argc, char **argv)
 					printf("accept() successed. peer=%d\n", n);
 
 					FD_SET(n, &active_fds);
-					peerfd = n;
+					peerfd = n;	
+					maxfd = maxfd < peerfd ? peerfd : maxfd;
 				} else {
 					n = read_from_client(i);
 					if (n < 0) {
 						/* remove client when lost connection*/
-						close(i);
-						FD_CLR(i, &active_fds);
-						peerfd = -1;
+						disconnect(i);
+						continue;
+					}
+					n = write_to_client();
+					if (n < 0) {
+						/* remove client when lost connection*/
+						disconnect(i);
+						continue;
 					}
 				}
 			}
@@ -121,6 +132,15 @@ int main(int argc, char **argv)
 
 	return 0;
 }
+
+int disconnect(int peer)
+{
+	close(peer);
+	FD_CLR(peer, &active_fds);
+	peerfd = -1;
+}
+
+
 
 char *toUpper(char *str) 
 {
@@ -141,22 +161,22 @@ static int read_from_client(int filedes)
 	char buffer[MAXLEN];
 	int nbytes;
 	int seq = 0;
-	int rx_seq = 0;
-	int oops = 0;
+	static int rx_seq = 0;
+	static int oops = 0;
+	int size = 14;
 
-	printf("%s(%d): try to read() new_sock=%d\n", __func__, __LINE__, filedes);
+	// printf("%s(%d): try to read() new_sock=%d\n", __func__, __LINE__, filedes);
 
-	nbytes = read(filedes, buffer, MAXLEN);
+	nbytes = read(filedes, buffer, size);
 	if (nbytes < 0) {
 		/* Read error. */
-		perror ("read");
-		exit (EXIT_FAILURE);
+		return nbytes;
 	} else if (nbytes == 0)
 		/* End-of-file. */
 		return -1;
 
 	/* Data read. */
-	fprintf (stderr, "Server: got message: new_sock=%d, `%s'\n", filedes, buffer);
+	// fprintf (stderr, "Server: got message: new_sock=%d, `%s'\n", filedes, buffer);
 	buffer[nbytes] = 0;
 	printf("%s: received=%d, oops=%d\n", buffer, nbytes, oops);
 
@@ -169,42 +189,27 @@ static int read_from_client(int filedes)
 	return 0;
 }
 
-#if 0
 int write_to_client()
 {
-	if (strlen(buf) == 0) 
-		return 0;
+	unsigned char buf[100];
+	static int cnt = 0;
+	int nbytes;
 
-	memcpy(copybuf, buf, strlen(buf));
+	sprintf(buf, "answer-%d\n", cnt++);
 
-	FD_ZERO(&write_fds);
-	FD_SET(sockfd, &write_fds);
+//	FD_ZERO(&write_fds);
+//	FD_SET(sockfd, &write_fds);
 
-	if (FD_ISSET(sockfd, &write_fds)) {
-		toUpper(copybuf);
-#ifdef __XX
-		nbytes = sendto(sockfd, copybuf, MAXLEN, 0, 
-				(struct sockaddr *) &cli_addr, sizeof(cli_addr));
-#else
-		//				nbytes = sendto(sockfd, copybuf, 1, 0, 
-		// (struct sockaddr*) &cli_addr, sizeof(cli_addr));
-		nbytes = 1;
-#endif
+//	if (FD_ISSET(sockfd, &write_fds)) {
+		nbytes = send(peerfd, buf, strlen(buf), 0);
 		if (nbytes < 0) {
 			printf("ERROR in sendto. err=%d(%s)",
 					errno, strerror(errno));
-			close(sockfd);
-			exit(1);
+			close(peerfd);
 		}
 
-		//printf("Send to client: %s", copybuf);
-		//printf("==========================\n");
-		memset(&copybuf, 0, sizeof(copybuf));
-		FD_CLR(sockfd, &write_fds);
-	}
+//		FD_CLR(sockfd, &write_fds);
+//	}
 
-	memset(&buf, 0, sizeof(buf));
-	free(buf);
-	free(copybuf);
+	return 0;
 }
-#endif
