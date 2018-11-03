@@ -507,7 +507,7 @@ static int request_msix_vectors(struct foo_gpio *foo)
 	int nvec;
 	int ret;
 
-	nvec = pci_alloc_irq_vectors(pdev, 1, 1, PCI_IRQ_MSIX);
+	nvec = pci_alloc_irq_vectors(pdev, 1, NR_GPIOS, PCI_IRQ_MSIX);
 	dev_info(dev, "pci_alloc_irq_vectors nvec=%d\n", nvec);
 	if (nvec < 0) {
 		dev_err(dev, "pci_alloc_irq_vectors failed. nvec=%d\n", nvec);

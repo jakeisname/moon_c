@@ -46,7 +46,7 @@ MODULE_LICENSE("GPL");
 #define USE_BGPIO
 #endif
 
-#define DRV_NAME "foo_gpio"
+#define DRV_NAME "foo_pci_2"
 #define NR_GPIOS 32
 
 /* pci bar0 for ivshmem */
@@ -77,30 +77,28 @@ struct foo_gpio {
 	raw_spinlock_t lock;
 	struct gpio_chip gc;
 
-	/* mmio control registers */
-	void __iomem    *regs_base_addr;
-	resource_size_t regs_start;
-	resource_size_t regs_len;
-
-	/* data mmio region */
-	void __iomem    *data_base_addr;
-	resource_size_t data_mmio_start;
-	resource_size_t data_mmio_len;
+	/*
+         * bar0: control register
+	 * bar1:
+         * bar2: data register
+         */
+	void __iomem    *bar_base_addr[6];
+	resource_size_t bar_start[6];
+	resource_size_t bar_len[6];
 
 	/* irq related */
 #ifdef USE_BGPIO
 	struct irq_chip_generic *icg;
-#endif
 	unsigned int irq;
+#endif
 
 	/* msix related */
-	char (*msix_names)[256];
+	char (*msix_names)[256];	/* 256 */
 	struct msix_entry *msix_entries;
 	int nvectors;
 };
 
-static u32 foo_rw(struct gpio_chip *gc, void __iomem *addr, 
-	u32 set, u32 clear)
+static u32 foo_rw(struct gpio_chip *gc, void __iomem *addr, u32 set, u32 clear)
 {
 	u32 mask, mask2;
 
@@ -176,7 +174,7 @@ static int foo_gpio_direction_output(struct gpio_chip *gc,
 	gc->set(gc, offset, val);	/* set value */
 
 	raw_spin_lock_irqsave(&foo->lock, flags);
-	foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_OUT_EN, mask, 0);
+	foo_rw(gc, foo->bar_base_addr[2] + VIRTUAL_GPIO_OUT_EN, mask, 0);
 	raw_spin_unlock_irqrestore(&foo->lock, flags);
 
 	printk(KERN_INFO "%s offset=%u, gpio=%u, init_val=%d\n",
@@ -193,7 +191,7 @@ static int foo_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
 	u32 mask = 1 << offset;
 
 	raw_spin_lock_irqsave(&foo->lock, flags);
-	foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_OUT_EN, 0, mask);
+	foo_rw(gc, foo->bar_base_addr[2] + VIRTUAL_GPIO_OUT_EN, 0, mask);
 	raw_spin_unlock_irqrestore(&foo->lock, flags);
 
 	printk(KERN_INFO "%s offset=%u, gpio=%u\n", 
@@ -211,7 +209,7 @@ static int foo_gpio_get(struct gpio_chip *gc, unsigned offset)
 	int val;
 
 	raw_spin_lock_irqsave(&foo->lock, flags);
-	mask = gc->read_reg(foo->data_base_addr + VIRTUAL_GPIO_DATA);
+	mask = gc->read_reg(foo->bar_base_addr[2] + VIRTUAL_GPIO_DATA);
 	val = !!(mask & (1 << offset));
 	raw_spin_unlock_irqrestore(&foo->lock, flags);
 
@@ -229,7 +227,7 @@ static void foo_gpio_set(struct gpio_chip *gc, unsigned offset, int val)
 	u32 mask = 1 << offset;
 
 	raw_spin_lock_irqsave(&foo->lock, flags);
-	foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_DATA, mask, 0);
+	foo_rw(gc, foo->bar_base_addr[2] + VIRTUAL_GPIO_DATA, mask, 0);
 	raw_spin_unlock_irqrestore(&foo->lock, flags);
 
 	printk(KERN_INFO "%s offset=%u, gpio=%u, val=%d\n",
@@ -266,41 +264,41 @@ static int foo_irq_set_type(struct irq_data *d, unsigned int type)
 	switch (type) {
 		case IRQ_TYPE_EDGE_RISING:
 			/* enable rising edge irq */
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_RISING, mask, 0);
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_FALLING, 0, mask);
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_INT_EN, mask, 0);
 			break;
 
 		case IRQ_TYPE_EDGE_FALLING:
 			/* enable falling edge irq */
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_RISING, 0, mask);
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_FALLING, mask, 0);
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_INT_EN, mask, 0);
 			break;
 
 		case IRQ_TYPE_EDGE_BOTH:
 			/* enable rising & falling edge irq */
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_RISING, mask, 0);
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_FALLING, mask, 0);
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_INT_EN, mask, 0);
 			break;
 
 		case IRQ_TYPE_NONE:
 			/* disable irq */
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_RISING, 0, mask);
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_FALLING, 0, mask);
-			foo_rw(gc, foo->data_base_addr + 
+			foo_rw(gc, foo->bar_base_addr[2] + 
 					VIRTUAL_GPIO_INT_EN, 0, mask);
 			break;
 		default:
@@ -324,18 +322,17 @@ static irqreturn_t foo_common_irq_handler(int irq, void * private)
 	if (unlikely(foo == NULL))
 		return IRQ_NONE;
 
-	status = gc->read_reg(foo->regs_base_addr + IntrStatus);
+	status = gc->read_reg(foo->bar_base_addr[0] + IntrStatus);
 	if (!status || (status == 0xFFFFFFFFL))
 		return IRQ_NONE;
 
-	pending = gc->read_reg(foo->data_base_addr + VIRTUAL_GPIO_INT_ST);
+	pending = gc->read_reg(foo->bar_base_addr[2] + VIRTUAL_GPIO_INT_ST);
 
 	printk(KERN_INFO "%s irq=%d, status=0x%lx, pending=0x%lx\n", 
 		__func__, irq, status, pending);
 
 	/* check if irq is really raised */
-	if (pending)
-	{
+	if (pending) {
 		/* hwirq range is 0 ~ 31 */
 		for_each_set_bit(hwirq, &pending, gc->ngpio) {
 			sub_irq = irq_find_mapping(gc->irqdomain, hwirq);
@@ -347,13 +344,12 @@ static irqreturn_t foo_common_irq_handler(int irq, void * private)
 #ifdef USE_BGPIO
 #else
 			/* eoi */
-			foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_INT_EOI, 
+			foo_rw(gc, foo->bar_base_addr[2] + VIRTUAL_GPIO_INT_EOI, 
 				1 << hwirq, 0);
 #endif
 #else
 			handle_nested_irq(sub_irq);
 #endif
-
 		}
 	}
 
@@ -403,7 +399,7 @@ static void foo_irq_ack(struct irq_data *d)
 	u32 mask = 1 << d->hwirq;
 
         raw_spin_lock_irqsave(&foo->lock, flags);
-	foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_INT_EOI, 0, mask);
+	foo_rw(gc, foo->bar_base_addr[2] + VIRTUAL_GPIO_INT_EOI, 0, mask);
         raw_spin_unlock_irqrestore(&foo->lock, flags);
 
         printk(KERN_INFO "%s irq=%u, hwirq=%lu\n",
@@ -419,7 +415,7 @@ static void foo_irq_eoi(struct irq_data *d)
 	u32 mask = 1 << d->hwirq;
 
         raw_spin_lock_irqsave(&foo->lock, flags);
-	foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_INT_EOI, mask, 0);
+	foo_rw(gc, foo->bar_base_addr[2] + VIRTUAL_GPIO_INT_EOI, mask, 0);
         raw_spin_unlock_irqrestore(&foo->lock, flags);
 
         printk(KERN_INFO "%s irq=%u, hwirq=%lu\n",
@@ -436,7 +432,7 @@ static void foo_irq_mask(struct irq_data *d)
 	u32 mask2;
 
         raw_spin_lock_irqsave(&foo->lock, flags);
-	mask2=foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_INT_EN, 0, mask);
+	mask2=foo_rw(gc, foo->bar_base_addr[2] + VIRTUAL_GPIO_INT_EN, 0, mask);
         raw_spin_unlock_irqrestore(&foo->lock, flags);
 
         printk(KERN_INFO "%s irq=%u, hwirq=%lu, mask2=0x%x\n",
@@ -452,7 +448,7 @@ static void foo_irq_unmask(struct irq_data *d)
 	u32 mask2;
 
         raw_spin_lock_irqsave(&foo->lock, flags);
-	mask2=foo_rw(gc, foo->data_base_addr + VIRTUAL_GPIO_INT_EN, mask, 0);
+	mask2=foo_rw(gc, foo->bar_base_addr[2] + VIRTUAL_GPIO_INT_EN, mask, 0);
         raw_spin_unlock_irqrestore(&foo->lock, flags);
 
         printk(KERN_INFO "%s irq=%u, hwirq=%lu, mask2=0x%x\n",
@@ -475,9 +471,11 @@ static struct irq_chip foo_gpio_irq_chip = {
 
 static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 {
-	int i, err;
+	int i;
 	const char *name = DRV_NAME;
-	struct device *dev = foo->dev;
+	int flags = PCI_IRQ_MSI | PCI_IRQ_MSIX;
+	int n = nvectors;
+	int irq = 0;
 
 	foo->nvectors = nvectors;
 
@@ -489,41 +487,74 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 	for (i = 0; i < nvectors; ++i)
 		foo->msix_entries[i].entry = i;
 
-	err = pci_enable_msix_exact(foo->pdev, foo->msix_entries,
-			foo->nvectors);
-	if (err > 0) {
-		printk(KERN_INFO "no MSI. Back to INTx.\n");
-		return -ENOSPC;
-	}
-	else if (err) {
-		printk(KERN_INFO "some error below zero %d\n", err);
-		return err;
-	}
+	n = pci_alloc_irq_vectors(foo->pdev, 1, nvectors, flags);
+	printk(KERN_INFO "alloc msi-irqs=%d\n", n);
 
-	for (i = 0; i < nvectors; i++) {
+	for (i = 0; i < n; i++) {
 
 		snprintf(foo->msix_names[i], sizeof(*foo->msix_names),
 				"%s-config", name);
 
-#ifdef CHAINED_IRQ
-#else
-		err = devm_request_threaded_irq(dev, 
-				foo->msix_entries[i].vector,
-				NULL, foo_nested_irq_handler, 
-				IRQF_SHARED | IRQF_ONESHOT,
-				foo->msix_names[i], foo);
+#if 1
+		irq = pci_irq_vector(foo->pdev, i);
+		foo->msix_entries[i].vector = irq;
 #endif
-
-		if (err) {
-			printk(KERN_INFO "couldn't allocate irq for msi-x " \
-					"entry %d with vector %d\n", 
-					i, foo->msix_entries[i].vector);
-			return -ENOSPC;
-		}
+		printk(KERN_INFO "%s: irq=%d\n", 
+			foo->msix_names[i], irq);
 	}
 
 	return 0;
 }
+
+void dump_cfg_headers(struct foo_gpio *foo)
+{
+	struct pci_dev *pdev = foo->pdev;
+	int j;
+	unsigned char value;
+	char buf[256] = { 0, };
+	int pos;
+
+	printk(KERN_INFO "configuration header: \n");
+	for (j = 0; j < 64; j++) {
+		pos = j % 0x10;
+		pci_read_config_byte(pdev, j, &value);
+		if (pos == 0x0)
+			sprintf(buf, "%04x: ", j);
+		sprintf(&buf[pos * 3 + 6], "%02x ", value);
+		if (pos == 0xf) {
+			buf[pos * 3 + 8] = 0;
+			printk(KERN_INFO "%s\n", buf);
+		}
+	}
+	printk(KERN_INFO "\n");
+}
+
+void dump_bars(struct foo_gpio *foo)
+{
+	int i;
+	int j;
+	unsigned char value;
+	char buf[256] = { 0, };
+	int pos;
+
+	for (i = 0; i < 3; i++) {
+		printk(KERN_INFO "BAR%d data: \n", i);
+
+		for (j = 0; j < 64; j++) {
+			pos = j % 0x10;
+			value = readb(foo->bar_base_addr[i] + j);
+			if (pos == 0)
+				sprintf(buf, "%04x: ", j);
+			sprintf(&buf[pos * 3 + 6], "%02x ", value);
+			if (pos == 0xf) {
+				buf[pos * 3 + 8] = 0;
+				printk(KERN_INFO "%s\n", buf);
+			}
+		}
+		printk(KERN_INFO "\n");
+	}
+}
+
 
 static int foo_gpio_probe(struct pci_dev *pdev,
 		const struct pci_device_id *pdev_id)
@@ -543,6 +574,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	struct irq_chip_generic *icg;
 	struct irq_chip_type *ct;
 #endif
+	int i;
 
 	printk(KERN_INFO "%s\n", __func__);
 
@@ -568,49 +600,35 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		goto pci_disable;
 	}
 
-	/* bar2: data mmio region */
-	foo->data_mmio_start = pci_resource_start(pdev, 2);
-	foo->data_mmio_len   = pci_resource_len(pdev, 2);
-	foo->data_base_addr = pcim_iomap(pdev, 2, 0);
-
-	if (!foo->data_base_addr) {
-		dev_err(dev, "cannot iomap region of size %lu\n",
-				(unsigned long) foo->data_mmio_len);
-		goto pci_release;
-	}
-
-	dev_info(dev, "bar2) data base=0x%lx\n",
-			(unsigned long) foo->data_base_addr);
-
-	dev_info(dev, "bar2) data start=0x%lx, len=0x%lx\n",
-			(unsigned long) foo->data_mmio_start,
-			(unsigned long) foo->data_mmio_len);
-
-
 	/* bar0: control registers */
-	foo->regs_start =  pci_resource_start(pdev, 0);
-	foo->regs_len = pci_resource_len(pdev, 0);
-	foo->regs_base_addr = pcim_iomap(pdev, 0, 0x100);
+	for (i = 0; i < 3; i++) {
+		foo->bar_start[i] =  pci_resource_start(pdev, i);
+		foo->bar_len[i] = pci_resource_len(pdev, i);
+		foo->bar_base_addr[i] = pcim_iomap(pdev, i, foo->bar_len[i]);
 
-	if (!foo->regs_base_addr) {
-		dev_err(dev, "cannot ioremap registers of size %lu\n",
-				(unsigned long) foo->regs_len);
-		goto pci_release;
+		if (!foo->bar_base_addr[i]) {
+			dev_err(dev, "cannot ioremap bar%d of size %lu\n",
+					i, (unsigned long) foo->bar_len[i]);
+			goto pci_release;
+		}
+
+		dev_info(dev, "bar%d) registers base=0x%lx \n",
+				i, (unsigned long) foo->bar_base_addr[i]);
+
+		dev_info(dev, "bar%d) registers start=0x%lx, len=0x%lx\n",
+				i, (unsigned long) foo->bar_start[i],
+				(unsigned long) foo->bar_len[i]);
 	}
 
-	dev_info(dev, "bar0) registers base=0x%lx \n",
-			(unsigned long) foo->regs_base_addr);
-
-	dev_info(dev, "bar0) registers start=0x%lx, len=0x%lx\n",
-			(unsigned long) foo->regs_start,
-			(unsigned long) foo->regs_len);
+	dump_cfg_headers(foo);
+	dump_bars(foo);
 
 	parent_irq = pdev->irq;
-	msix = parent_irq < 1;
+	msix = !parent_irq;
 	printk(KERN_INFO "%s parent_irq=%d\n", __func__, parent_irq);
 
 	/* interrupts: set all masks */
-	iowrite32(0xffffffff, foo->regs_base_addr + IntrMask);
+	iowrite32(0xffffffff, foo->bar_base_addr[0] + IntrMask);
 
 	desc = irq_to_desc(parent_irq);
 	if (desc)
@@ -622,8 +640,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 #ifdef CHAINED_IRQ
 #else
-	if (!msix)
-	{
+	if (!msix) {
 		ret = devm_request_threaded_irq(dev, parent_irq,
 				NULL, foo_nested_irq_handler, 
 				IRQF_SHARED | IRQF_ONESHOT, 
@@ -640,8 +657,8 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 #ifdef USE_BGPIO
 	gc->to_irq = foo_gpio_to_irq;
-	data = foo->data_base_addr + VIRTUAL_GPIO_DATA;
-	dir = foo->data_base_addr + VIRTUAL_GPIO_OUT_EN;
+	data = foo->bar_base_addr[2] + VIRTUAL_GPIO_DATA;
+	dir = foo->bar_base_addr[2] + VIRTUAL_GPIO_OUT_EN;
 	ret = bgpio_init(gc, dev, BITS_TO_BYTES(ngpios),
 			data, NULL, NULL, dir, NULL, 0);
 	if (ret) {
@@ -672,54 +689,54 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 
 	gc->parent = dev;
 
-	if (!msix) {
 #ifdef USE_BGPIO
-		irq_base = devm_irq_alloc_descs(dev, -1, 0, ngpios, 0);
-		if (irq_base < 0) {
-			ret = irq_base;
-			goto pci_release;
-		}
+	irq_base = devm_irq_alloc_descs(dev, -1, 0, ngpios, 0);
+	if (irq_base < 0) {
+		ret = irq_base;
+		goto pci_release;
+	}
 
-		gc->irqdomain = irq_domain_add_linear(0, ngpios,
-				&irq_domain_simple_ops, foo);
-		if (!gc->irqdomain) {
-			ret = -ENXIO;
-			dev_err(&pdev->dev, "cannot initialize irq domain\n");
-			goto pci_release;
-		}
+	gc->irqdomain = irq_domain_add_linear(0, ngpios,
+			&irq_domain_simple_ops, foo);
+	if (!gc->irqdomain) {
+		ret = -ENXIO;
+		dev_err(&pdev->dev, "cannot initialize irq domain\n");
+		goto pci_release;
+	}
 
-		irq_domain_associate_many(gc->irqdomain, irq_base, 0, ngpios);
+	irq_domain_associate_many(gc->irqdomain, irq_base, 0, ngpios);
 
-		/* allocation irq_chip_generic */
-		icg = devm_irq_alloc_generic_chip(dev, DRV_NAME, 1, irq_base,
-				foo->data_base_addr, handle_edge_irq);
-		if (!icg) {
-			ret = -ENXIO;
-			dev_err(dev, "irq_alloc_generic_chip failed!\n");
-			goto pci_release;
-		}
+	/* allocation irq_chip_generic */
+	icg = devm_irq_alloc_generic_chip(dev, DRV_NAME, 1, irq_base,
+			foo->bar_base_addr[2], handle_edge_irq);
+	if(!icg) {
+		ret = -ENXIO;
+		dev_err(dev, "irq_alloc_generic_chip failed!\n");
+		goto pci_release;
+	}
 
-		ct = icg->chip_types;
-		icg->private = foo;
-		foo->icg = icg;
+	ct = icg->chip_types;
+	icg->private = foo;
+	foo->icg = icg;
 
-		ct->type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
-		ct->chip.name = DRV_NAME;
-		ct->chip.irq_ack = irq_gc_ack_set_bit;
-		ct->chip.irq_mask = irq_gc_mask_clr_bit;
-		ct->chip.irq_unmask = irq_gc_mask_set_bit;
-		ct->chip.irq_set_type = foo_irq_set_type;
+	ct->type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
+	ct->chip.name = DRV_NAME;
+	ct->chip.irq_ack = irq_gc_ack_set_bit;
+	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+	ct->chip.irq_set_type = foo_irq_set_type;
 
-		ct->regs.ack = VIRTUAL_GPIO_INT_EOI;
-		ct->regs.mask = VIRTUAL_GPIO_INT_EN;
+	ct->regs.ack = VIRTUAL_GPIO_INT_EOI;
+	ct->regs.mask = VIRTUAL_GPIO_INT_EN;
 
-		/* Setup a range of interrupts with a generic chip */
-		devm_irq_setup_generic_chip(dev, icg, 
-				IRQ_MSK(NR_GPIOS), 0, 0, 0);
+	/* Setup a range of interrupts with a generic chip */
+	devm_irq_setup_generic_chip(dev, icg, 
+		IRQ_MSK(NR_GPIOS), 0, 0, 0);
 
-		gpiochip_set_chained_irqchip(gc, &ct->chip, 
-				parent_irq, foo_chained_irq_handler);
+	gpiochip_set_chained_irqchip(gc, &ct->chip, 
+			parent_irq, foo_chained_irq_handler);
 #else /* USE_BGPIO */
+	if (!msix) {
 #ifdef CHAINED_IRQ
 		ret = gpiochip_irqchip_add(gc, &foo_gpio_irq_chip, 0,
 				handle_edge_irq, IRQ_TYPE_NONE);
@@ -743,14 +760,17 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 		}
 
 		gpiochip_set_nested_irqchip(gc, &foo_gpio_irq_chip, 
-				parent_irq);
+			parent_irq);
 #endif
+	}
 #endif /* USE_BGPIO */
-	} else {
-		if (request_msix_vectors(foo, NR_GPIOS) != 0)
+
+	if (msix) {
+		if (request_msix_vectors(foo, NR_GPIOS) != 0) {
 			printk(KERN_INFO "MSI-X disabled\n");
-		else 
+		} else {
 			printk(KERN_INFO "MSI-X enabled\n");
+		}
 	}
 
 	pci_set_drvdata(pdev, foo);
