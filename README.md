@@ -97,3 +97,14 @@ http://jake.dothome.co.kr
   - foo-lcd.c
     - i2c client 에뮬레이션 샘플
     - 0x3f 주소를 갖는 1602-LCD-I2C(16x2)의 백라이트를 제어
+
+* foo-pci-1 디렉토리
+  - foo-pci-1.c
+    - pci 디바이스 덤프
+
+* foo-pci-2 디렉토리
+  - foo-pci-2.c
+    - ivshmem pci 디바이스를 사용한 가상 gpio 컨트롤러 구현
+    - chained irq & nested irq test for legacy IRQx 
+    - MSI-x enable
+  
