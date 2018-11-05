@@ -1,7 +1,7 @@
 
 
 $ cat tap_eth.sh
-
+<code>
 WHOAMI=$(whoami)
 DEV=enx00e04c36005f
 DEV_TAP=tap0
@@ -20,5 +20,5 @@ sudo modprobe ip_tables
 sudo modprobe iptable_filter
 sudo sysctl -w net.ipv4.ip_forward=1
 sudo iptables -t nat -A POSTROUTING -o ${DEV} -j MASQUERADE
-
+</code>
 
