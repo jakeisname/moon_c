@@ -469,6 +469,18 @@ static struct irq_chip foo_gpio_irq_chip = {
  * 3) pci driver probe part
  *****************************************************************/
 
+static irqreturn_t foo_irq_handler(int irq, void * private)
+{
+	irqreturn_t r = IRQ_HANDLED;
+	static int cnt = 0;
+
+	printk(KERN_INFO "%s irq=%d, cnt=%d\n", __func__, irq, cnt++);
+
+	generic_handle_irq(sub_irq);
+
+	return r;
+}
+
 static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 {
 	int i;
@@ -476,6 +488,7 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 	int flags = PCI_IRQ_MSI | PCI_IRQ_MSIX;
 	int n = nvectors;
 	int irq = 0;
+	int ret;
 
 	foo->nvectors = nvectors;
 
@@ -484,7 +497,7 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 	foo->msix_names = kmalloc(nvectors * sizeof(*foo->msix_names),
 			GFP_KERNEL);
 
-	for (i = 0; i < nvectors; ++i)
+	for (i = 0; i < nvectors; i++)
 		foo->msix_entries[i].entry = i;
 
 	n = pci_alloc_irq_vectors(foo->pdev, 1, nvectors, flags);
@@ -495,12 +508,20 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 		snprintf(foo->msix_names[i], sizeof(*foo->msix_names),
 				"%s-config", name);
 
-#if 1
 		irq = pci_irq_vector(foo->pdev, i);
 		foo->msix_entries[i].vector = irq;
-#endif
-		printk(KERN_INFO "%s: irq=%d\n", 
-			foo->msix_names[i], irq);
+
+		ret = devm_request_threaded_irq(foo->dev, irq,
+				NULL, foo_irq_handler, 
+				IRQF_SHARED | IRQF_ONESHOT, DRV_NAME, foo);
+		if (ret < 0) {
+			dev_err(foo->dev, 
+				"devm_request_threaded_irq error %d for device %s\n",
+				ret, pci_name(foo->pdev));
+			return ret;
+		}
+
+		printk(KERN_INFO "%s: irq=%d\n", foo->msix_names[i], irq);
 	}
 
 	return 0;
