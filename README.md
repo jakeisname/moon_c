@@ -67,12 +67,6 @@ http://jake.dothome.co.kr
   - gpio.c        
     - pci 플랫폼 드라이버에 gpio 컨트롤러를 연동하고 legacy 인터럽트 연동 샘플
 
-
-* msi 디렉토리
-  - gpio.c          
-    - pci 플랫폼 드라이버에 gpio 컨트롤러를 연동하고 msi 인터럽트 연동 샘플 (홀딩)
-
-
 * sysfs 디렉토리
   - foo1.c        
     - sysfs 속성 및 이벤트 발생 테스트 (kobject_add 사용)
@@ -106,5 +100,4 @@ http://jake.dothome.co.kr
   - foo-pci-2.c
     - ivshmem pci 디바이스를 사용한 가상 gpio 컨트롤러 구현
     - chained irq & nested irq test for legacy IRQx 
-    - MSI-x enable
-  
+    - MSI-x enable  
