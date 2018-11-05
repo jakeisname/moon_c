@@ -1,24 +1,14 @@
 
+qemuu의 ivshmem pci 드라이버를 사용하여 가상 gpio 컨트롤러 구현
 
-$ cat tap_eth.sh
-<code>
-WHOAMI=$(whoami)
-DEV=enx00e04c36005f
-DEV_TAP=tap0
-IP_TAP=$(ip addr show ${DEV_TAP} | awk '/inet / {print $2}' | cut -d/ -f1)
+목표: 
+* qemu 2.5를 사용 시 legacy INTx를 사용하고 chained irq와 nested irq 구현
+* qemu 2.6 이상 사용 시 MSI-X를 사용하여 gpio 포트 수 만큼 직접 irq 할당
 
-if [ "$IP_TAP" == "20.0.2.4" ]; then
-echo tap0 interface is already installed.
-exit
-fi
-
-echo setup NAT network: tap0 to ethernet:${DEV}
-sudo tunctl -d ${DEV_TAP}
-sudo tunctl -u ${WHOAMI}
-sudo ifconfig ${DEV_TAP} 20.0.2.4/24 up
-sudo modprobe ip_tables
-sudo modprobe iptable_filter
-sudo sysctl -w net.ipv4.ip_forward=1
-sudo iptables -t nat -A POSTROUTING -o ${DEV} -j MASQUERADE
-</code>
-
+동작 순서:
+* 터미널1
+  * tap_eth.sh (tap0 디바이스)
+  * ivsh.sh    (ivshmem-server 구동)
+  * run-kvm-ivshmem.sh
+* 터미널2
+  * ivshmem-client  (인터럽트 발생 테스트용)
