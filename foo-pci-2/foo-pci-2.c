@@ -98,6 +98,33 @@ struct foo_gpio {
 	int nvectors;
 };
 
+struct foo_gpio *_foo = NULL;
+static int dump_cfg_headers(struct foo_gpio *foo, char *out);
+static int dump_bars(struct foo_gpio *foo, char *out);
+
+static ssize_t bar_show(struct device_driver *driver, char *buf)
+{
+	size_t size = 0;
+
+	size += dump_cfg_headers(_foo, buf);
+	size += dump_bars(_foo, buf + size);
+
+	return size;
+}
+
+static ssize_t bar_store(struct device_driver *driver,
+		const char *buf, size_t len)
+{
+	return 0;
+}
+
+static DRIVER_ATTR_RW(bar);
+static struct attribute *foo_driver_attrs[] = {
+	&driver_attr_bar.attr,
+	NULL
+};
+ATTRIBUTE_GROUPS(foo_driver);
+
 static u32 foo_rw(struct gpio_chip *gc, void __iomem *addr, u32 set, u32 clear)
 {
 	u32 mask, mask2;
@@ -476,8 +503,6 @@ static irqreturn_t foo_irq_handler(int irq, void * private)
 
 	printk(KERN_INFO "%s irq=%d, cnt=%d\n", __func__, irq, cnt++);
 
-	generic_handle_irq(sub_irq);
-
 	return r;
 }
 
@@ -527,15 +552,16 @@ static int request_msix_vectors(struct foo_gpio *foo, int nvectors)
 	return 0;
 }
 
-void dump_cfg_headers(struct foo_gpio *foo)
+static int dump_cfg_headers(struct foo_gpio *foo, char *out)
 {
 	struct pci_dev *pdev = foo->pdev;
 	int j;
 	unsigned char value;
 	char buf[256] = { 0, };
 	int pos;
+	int size = 0;
 
-	printk(KERN_INFO "configuration header: \n");
+	size += scnprintf(out, PAGE_SIZE, "configuration header: \n");
 	for (j = 0; j < 64; j++) {
 		pos = j % 0x10;
 		pci_read_config_byte(pdev, j, &value);
@@ -544,22 +570,25 @@ void dump_cfg_headers(struct foo_gpio *foo)
 		sprintf(&buf[pos * 3 + 6], "%02x ", value);
 		if (pos == 0xf) {
 			buf[pos * 3 + 8] = 0;
-			printk(KERN_INFO "%s\n", buf);
+			size += scnprintf(out + size, PAGE_SIZE, "%s\n", buf);
 		}
 	}
-	printk(KERN_INFO "\n");
+	size += scnprintf(out + size, PAGE_SIZE, "\n");
+
+	return size;
 }
 
-void dump_bars(struct foo_gpio *foo)
+static int dump_bars(struct foo_gpio *foo, char *out)
 {
 	int i;
 	int j;
 	unsigned char value;
 	char buf[256] = { 0, };
 	int pos;
+	int size = 0;
 
 	for (i = 0; i < 3; i++) {
-		printk(KERN_INFO "BAR%d data: \n", i);
+		size += scnprintf(out + size, PAGE_SIZE, "BAR%d data: \n", i);
 
 		for (j = 0; j < 64; j++) {
 			pos = j % 0x10;
@@ -569,11 +598,13 @@ void dump_bars(struct foo_gpio *foo)
 			sprintf(&buf[pos * 3 + 6], "%02x ", value);
 			if (pos == 0xf) {
 				buf[pos * 3 + 8] = 0;
-				printk(KERN_INFO "%s\n", buf);
+				size += scnprintf(out + size, PAGE_SIZE, "%s\n", buf);
 			}
 		}
-		printk(KERN_INFO "\n");
+		size += scnprintf(out + size, PAGE_SIZE, "\n");
 	}
+
+	return size;
 }
 
 
@@ -606,6 +637,7 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 	gc = &foo->gc;
 	foo->dev = dev;
 	foo->pdev = pdev;
+	_foo = foo;
 
 	raw_spin_lock_init(&foo->lock);
 
@@ -640,9 +672,6 @@ static int foo_gpio_probe(struct pci_dev *pdev,
 				i, (unsigned long) foo->bar_start[i],
 				(unsigned long) foo->bar_len[i]);
 	}
-
-	dump_cfg_headers(foo);
-	dump_bars(foo);
 
 	parent_irq = pdev->irq;
 	msix = !parent_irq;
@@ -832,6 +861,7 @@ static struct pci_driver foo_gpio_driver = {
         .id_table  = foo_gpio_id_table,
 	.probe = foo_gpio_probe,
 	.remove= foo_gpio_remove,
+	.groups = foo_driver_groups,
 };
 
 /* arch_initcall_sync(foo_gpio_init); */
