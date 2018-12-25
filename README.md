@@ -101,3 +101,9 @@ http://jake.dothome.co.kr
     - ivshmem pci 디바이스를 사용한 가상 gpio 컨트롤러 구현
     - chained irq & nested irq test for legacy IRQx 
     - MSI-x enable  
+
+* tcp-1 디렉토리
+  - tcp server example (select 사용, queue 및 예외 처리 로직 등을 추가하여 실전 서버 소켓과 유사하게 구현)
+  - telnet과 연동 테스트용
+  - 실전 서버에는 이 샘플 코드 외에 구조체 전송, magic number 및 seq_id 비교 로직등이 추가 구현됨.
+ 
