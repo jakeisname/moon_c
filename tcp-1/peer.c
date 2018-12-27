@@ -72,9 +72,9 @@ int receive_from_peer(peer_t *peer, int (*message_handler)(peer_t *))
 			len, MSG_DONTWAIT);
 	if (n < 0) {
 		/* peer busy? or server busy? then try again later */
-		if ((errno == EAGAIN) || (errno == EINTR))
+		if (errno == EAGAIN || errno == EINTR)
 			return 0;	/* continue */
-		if (errno == EPIPE) {
+		else if (errno == EPIPE || errno == ETIMEDOUT ) {
 			printf("recv() failed & try to close socket. err=%d(%s)\n",
 					errno, strerror(errno));
 			return -1;	/* close client socket */
@@ -157,10 +157,14 @@ int send_to_peer(peer_t *peer)
 	n = send(peer->socket, (char *) &peer->tx_buff + peer->tx_bytes, len, 0);
 	if (n < 0) {
 		/* peer is not ready right now or server is interrupted, try again later. */
-		if ((errno == EAGAIN) || (errno == EINTR))
+		if (errno == EAGAIN || errno == EINTR)
 			return 0;
-		else {
-			printf("send() failed. err=%d(%s)\n",
+		else if (errno == EPIPE || errno == ETIMEDOUT) {
+			printf("send() failed & try to close socket. err=%d(%s)\n",
+					errno, strerror(errno));
+			return -1;
+		} else {
+			printf("send() failed & try to close socket. err=%d(%s)\n",
 					errno, strerror(errno));
 			return -1;
 		}

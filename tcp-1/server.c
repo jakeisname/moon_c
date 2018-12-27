@@ -11,19 +11,6 @@
 #include "common.h"
 
 
-static int set_reuseaddr_opt(int socket)
-{
-	int reuse = 1;
-
-	if (setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) != 0) {
-		printf("setsockopt(SO_REUSE_ADDR) failed. errno=%d(%s)\n", 
-				errno, strerror(errno));
-		return -1;
-	}
-	return 0;
-}
-
-
 /* Start listening from listen socket */
 int start_listen_socket(int port, int *listen_sock)
 {
@@ -100,6 +87,10 @@ int handle_new_connection()
 				errno, strerror(errno));
 		return -1;
 	}
+	
+	/* no traffic during 10 seconds then 
+	 *	send keepalive packets 3 times during 5 seconds */
+	set_sock_keepallive(new_client_sock, 10, 5, 3);
 
 	inet_ntop(AF_INET, &client_addr.sin_addr, client_ipv4_str, INET_ADDRSTRLEN);
 	printf("Incoming connection from %s(%d).\n", 

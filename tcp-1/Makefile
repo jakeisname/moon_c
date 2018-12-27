@@ -1,7 +1,7 @@
 CC = gcc
 CFALGS = -W -Wall
 TARGET = tcpd
-OBJECTS = peer.o signal.o queue.o stdin.o server.o msg.o main.o
+OBJECTS = peer.o signal.o queue.o stdin.o server.o msg.o option.o main.o
 
 all : $(TARGET)
 

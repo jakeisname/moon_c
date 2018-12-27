@@ -73,6 +73,11 @@ typedef struct {
 extern peer_t server;
 extern peer_t clients[MAX_CLIENTS];
 
+/* option.c */
+int set_reuseaddr_opt(int fd);
+int set_sock_nonblocking(int fd);
+int set_sock_timeout(int fd, int sec);
+void set_sock_keepallive(int fd, int idle, int interval, int cnt);
 
 /* msg.c */
 extern int prepare_message(char *sender, char *data, message_t *message);
