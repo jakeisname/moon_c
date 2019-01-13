@@ -243,7 +243,7 @@ static client_msg_handler_t client_msg_handler[MSG_TYPE_MAX] = {
 	{ NULL,			client_process_data3 },
 };
 
-#define MAKE_BUG
+//#define MAKE_BUG
 static void prepare_common_data(peer_t *peer, message_t *msg, msg_type_t type, int msg_len)
 {
 	memset(msg, 0, sizeof(message_t));

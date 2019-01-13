@@ -12,7 +12,7 @@
 #define MAX_QUEUE_SIZE 100
 
 /* listen for server */
-#define SERVER_IPV4_ADDR "127.0.0.1"
+#define SERVER_IPV4_ADDR "0.0.0.0"
 
 /* message */
 
