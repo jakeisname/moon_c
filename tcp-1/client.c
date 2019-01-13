@@ -87,7 +87,7 @@ static int send_random_data(peer_t *client)
 {
 	int rc;
 	long rnd = random();
-	char buff[32];
+	char buff[MAX_TEXT_SIZE];
 	static int cnt = 1;
 
 	switch (rnd % 3) {
