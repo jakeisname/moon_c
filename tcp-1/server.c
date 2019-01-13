@@ -17,7 +17,7 @@ int start_listen_socket(int port, int *listen_sock)
 	struct sockaddr_in my_addr;
 
 	/* Obtain a file descriptor for our "listening" socket. */
-	*listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+	*listen_sock = socket(PF_INET, SOCK_STREAM, 0);
 	if (*listen_sock < 0) {
 		printf("socket() failed. errno=%d(%s)\n",
 				errno, strerror(errno));
@@ -62,6 +62,7 @@ static int add_to_new_connection(int new_client_sock, struct sockaddr_in *client
 			clients[i].addres = *client_addr;
 			clients[i].tx_bytes = -1;
 			clients[i].rx_bytes = 0;
+			clients[i].seq_id = 0;
 			return 0;
 		}
 	}
@@ -70,7 +71,7 @@ static int add_to_new_connection(int new_client_sock, struct sockaddr_in *client
 	return -1;
 }
 
-int handle_new_connection()
+static int handle_new_connection()
 {
 	int i;
 	int rc;
@@ -89,7 +90,7 @@ int handle_new_connection()
 	}
 	
 	/* no traffic during 10 seconds then 
-	 *	send keepalive packets 3 times during 5 seconds */
+	 *	send 3 keepalive packets every 5 seconds */
 	set_sock_keepallive(new_client_sock, 10, 5, 3);
 
 	inet_ntop(AF_INET, &client_addr.sin_addr, client_ipv4_str, INET_ADDRSTRLEN);
@@ -107,15 +108,17 @@ int handle_new_connection()
 
 }
 
-int close_client_connection(peer_t *client)
+static int close_client_connection(peer_t *client)
 {
 	printf("Close client socket for %s.\n", peer_get_addres_str(client));
+	printf("\n\n\n");
 
 	close(client->socket);
 	client->socket = NO_SOCKET;
 	dequeue_all(&client->fifo);
 	client->tx_bytes = -1;
 	client->rx_bytes = 0;
+	client->seq_id = 0;
 }
 
 int get_client_name(int argc, char **argv, char *client_name)
@@ -129,7 +132,7 @@ int get_client_name(int argc, char **argv, char *client_name)
 }
 
 
-int build_fd_sets(fd_set *read_fds, fd_set *write_fds, fd_set *except_fds)
+static int build_fd_sets(fd_set *read_fds, fd_set *write_fds, fd_set *except_fds)
 {
 	int i;
 
@@ -160,15 +163,6 @@ int build_fd_sets(fd_set *read_fds, fd_set *write_fds, fd_set *except_fds)
 	return 0;
 }  
 
-
-/* You should be careful when using this function in multythread program. 
- * Ensure that server is thread-safe. */
-void shutdown_properly(int code)
-{
-	delete_peer(&server);
-	printf("Shutdown client properly.\n");
-	exit(code);
-}
 
 
 static int get_max_fds()
@@ -213,7 +207,7 @@ static int do_server_ex(fd_set *read_fds, fd_set *write_fds, fd_set *except_fds,
 	for (i = 0; i < MAX_CLIENTS; ++i) {
 		if (clients[i].socket != NO_SOCKET && 
 				FD_ISSET(clients[i].socket, read_fds)) {
-			rc = receive_from_peer(&clients[i], &handle_received_message);
+			rc = receive_from_peer(&clients[i], &handle_server_message);
 			if (rc < 0)
 				close_client_connection(&clients[i]);
 			

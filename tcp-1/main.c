@@ -11,6 +11,7 @@
 
 peer_t server; 			/* used for server */
 peer_t clients[MAX_CLIENTS];	/* used for clients */
+peer_t *g_peer = &server;
 
 int main(int argc, char **argv)
 {

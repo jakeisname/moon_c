@@ -32,7 +32,7 @@ int read_from_stdin(char *read_buffer, size_t max_len)
 		if (tot_n > max_len) {
 			printf("Message too large and will be chopped. "\
 					"Please try to be shorter next time.\n");
-			fflush(STDIN_FILENO);
+			// fflush(stdin);
 			return 0;
 		}
 	}
@@ -46,16 +46,16 @@ int read_from_stdin(char *read_buffer, size_t max_len)
 int handle_read_from_stdin()
 {
 	int i;
-	char stdin_buff[DATA_MAXSIZE]; /* buffer for stdin */
+	char stdin_buff[MAX_TEXT_SIZE]; /* buffer for stdin */
 	message_t new_msg;
 
-	if (read_from_stdin(stdin_buff, DATA_MAXSIZE) < 0)
+	if (read_from_stdin(stdin_buff, MAX_TEXT_SIZE) < 0)
 		return -1;
 
+#if 0
 	/* Create new message and enqueue it. */
 	memset(&new_msg, 0, sizeof(new_msg));
 	prepare_message(SERVER_NAME, stdin_buff, &new_msg);
-	print_message(&new_msg);
 
 	/* enqueue message for all clients */
 	for (i = 0; i < MAX_CLIENTS; ++i) {
@@ -64,6 +64,7 @@ int handle_read_from_stdin()
 				printf("Send buffer was overflowed, we lost this message!\n");
 		}
 	}
+#endif
 
 	return 0;
 }
