@@ -13,6 +13,7 @@
 
 /* listen for server */
 #define SERVER_IPV4_ADDR "0.0.0.0"
+#define DEFAULT_PORT 	 2000
 
 /* message */
 
@@ -112,6 +113,8 @@ extern int send_data2(peer_t *peer, int a, int b, int c);
 extern int send_data3(peer_t *peer, char *text);
 
 /* peer.c */
+void enable_dump(void);
+int is_enable_dump(void);
 extern void set_qna_state(peer_t *peer, int state);
 extern int get_qna_state(peer_t *peer);
 extern void shutdown_properly(int code);

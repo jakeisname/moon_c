@@ -12,19 +12,37 @@
 peer_t client;
 peer_t *g_peer = &client;
 
+static void show_usage(char *name)
+{
+	printf("usage) %s [-c <connect_ip>] [-p <port>]\n", name);
+}
+	
 int main(int argc, char **argv)
 {
 	int i;
-	char *server_ip;
-	int port;	
+	char *server_ip = SERVER_IPV4_ADDR;
+	int port = DEFAULT_PORT;	
 
-	if (argc < 3) {
-		printf("usage) %s <ip> <port>\n", argv[0]);
-		exit(EXIT_FAILURE);
-	}
-	
-	server_ip = argv[1];
-	port = atoi(argv[2]);
+	const char *optstring = "c:p:d"; 
+	char option; 
+
+	optind = 1; 
+	while (-1 != (option = getopt(argc, argv, optstring))) { 
+		switch (option) { 
+			case 'c' : 
+				server_ip = optarg;
+				break; 
+			case 'p' : 
+				port = atoi(optarg); 
+				break; 
+			case 'd' : 
+				enable_dump();
+				break; 
+			default: 
+				show_usage((char *) argv[0]);
+				exit(EXIT_FAILURE);
+		}; 
+	};
 
 	/* for SIGINT & SIGPIPE */
 	if (setup_signals() != 0)

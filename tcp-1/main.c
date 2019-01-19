@@ -13,17 +13,33 @@ peer_t server; 			/* used for server */
 peer_t clients[MAX_CLIENTS];	/* used for clients */
 peer_t *g_peer = &server;
 
+static void show_usage(char *name)
+{
+	printf("usage) %s [-p <port>] [-d]\n", name);
+}
+
+
 int main(int argc, char **argv)
 {
 	int i;
-	int port;	/* server listen port */
+	int port = DEFAULT_PORT;	/* server listen port */
+	const char *optstring = "p:d"; 
+	char option; 
 
-	if (argc < 2) {
-		printf("usage) %s <port>\n", argv[0]);
-		exit(EXIT_FAILURE);
-	}
-	
-	port = atoi(argv[1]);
+	optind = 1; 
+	while (-1 != (option = getopt(argc, argv, optstring))) { 
+		switch (option) { 
+			case 'p' : 
+				port = atoi(optarg); 
+				break; 
+			case 'd' : 
+				enable_dump();
+				break; 
+			default: 
+				show_usage((char *) argv[0]);
+				exit(EXIT_FAILURE);
+		}; 
+	};
 
 	/* for SIGINT & SIGPIPE */
 	if (setup_signals() != 0)

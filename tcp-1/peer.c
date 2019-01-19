@@ -10,7 +10,18 @@
 #include <errno.h>
 #include "common.h"
 
-// #define DEBUG_DUMP_PACKET
+static int _enable_dump;
+
+void enable_dump(void)
+{
+	printf("dump enabled.\n");
+	_enable_dump = 1;
+}
+
+int is_enable_dump(void)
+{
+	return _enable_dump;
+}
 
 /* state: 0=possible to request, 1=answer state */
 void set_qna_state(peer_t *peer, int state)
@@ -156,9 +167,8 @@ int receive_from_peer(peer_t *peer, int (*message_handler)(peer_t *))
 		return -1;	/* close client socket */
 	}
 
-#ifdef DEBUG_DUMP_PACKET
-	dump_packet("RX", (char *) &peer->rx_buff, peer->rx_bytes, n);
-#endif
+	if (is_enable_dump())
+		dump_packet("RX", (char *) &peer->rx_buff, peer->rx_bytes, n);
 
 	/* received n bytes */
 	clear_rx_retry_cnt(peer);
@@ -234,9 +244,8 @@ int send_to_peer(peer_t *peer)
                  * It seems that peer can't accept data right now. Try again later. */
 		return 0;
 
-#ifdef DEBUG_DUMP_PACKET
-	dump_packet("TX", (char *) &peer->tx_buff, peer->tx_bytes, n);
-#endif
+	if (is_enable_dump())
+		dump_packet("TX", (char *) &peer->tx_buff, peer->tx_bytes, n);
 
 	/* send n bytes */
 	tot_n = peer->tx_bytes;
