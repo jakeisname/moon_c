@@ -14,7 +14,7 @@ peer_t *g_peer = &client;
 
 static void show_usage(char *name)
 {
-	printf("usage) %s [-c <connect_ip>] [-p <port>]\n", name);
+	printf("usage) %s [-c <ip>] [-p <port>] [-t]\n", name);
 }
 	
 int main(int argc, char **argv)
@@ -37,6 +37,9 @@ int main(int argc, char **argv)
 				break; 
 			case 'd' : 
 				enable_dump();
+				break; 
+			case 't' : 
+				enable_trouble();
 				break; 
 			default: 
 				show_usage((char *) argv[0]);

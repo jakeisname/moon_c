@@ -104,6 +104,8 @@ extern void set_sock_keepallive(int fd, int idle, int interval, int cnt);
 extern void set_sock_nodelay(int fd);
 
 /* msg.c */
+extern void enable_trouble(void);
+extern int is_enable_trouble(void);
 extern void convert_hton_common_data(peer_t *peer);
 extern void convert_hton_each_data_type(peer_t *peer);
 extern int handle_server_message(peer_t *peer);

@@ -10,6 +10,19 @@
 #include <errno.h>
 #include "common.h"
 
+int _enable_trouble = 0;
+
+void enable_trouble(void)
+{
+	_enable_trouble = 1;
+}
+
+int is_enable_trouble(void)
+{
+	return _enable_trouble;
+}
+
+
 /**************************************************************
  *
  * for server
@@ -243,7 +256,6 @@ static client_msg_handler_t client_msg_handler[MSG_TYPE_MAX] = {
 	{ NULL,			client_process_data3 },
 };
 
-//#define MAKE_BUG
 static void prepare_common_data(peer_t *peer, message_t *msg, msg_type_t type, int msg_len)
 {
 	memset(msg, 0, sizeof(message_t));
@@ -254,17 +266,18 @@ static void prepare_common_data(peer_t *peer, message_t *msg, msg_type_t type, i
 	msg->msg_type = type;
 	msg->msg_len = msg_len;
 
-#ifdef MAKE_BUG
-	static int cnt1 = 0;
-	if ((random() % 100) == 0)
-		msg->magic = htonl(MAGIC_NUM);
-	if ((random() % 100) == 0)
-		msg->magic = 999;
-	if ((random() % 100) == 0)
-		msg->seq_id = 888;
-	if ((random() % 100) == 0)
-		peer->trans_id++;
-#endif
+	if (is_enable_trouble()) {
+		static int cnt1 = 0;
+
+		if ((random() % 100) == 0)
+			msg->magic = htonl(MAGIC_NUM);
+		if ((random() % 100) == 0)
+			msg->magic = 999;
+		if ((random() % 100) == 0)
+			msg->seq_id = 888;
+		if ((random() % 100) == 0)
+			peer->trans_id++;
+	}
 }
 
 void convert_hton_common_data(peer_t *peer)
