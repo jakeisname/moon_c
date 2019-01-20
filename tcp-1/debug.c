@@ -3,17 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DEBUG_DUMP_PACKET
-
 void dump_packet(char *tx_rx, char *p, int start, int len)
 {
-#ifdef DEBUG_DUMP_PACKET
 	unsigned char buff[64];
 	int i, pos;
 	int pre = 0;
 	unsigned char c;
+	int len2 = len > 64 ? 64 : len;
 
-	for (i = 0; i < len; i++) {
+	for (i = 0; i < len2; i++) {
 		pos = i % 16;
 		c = *(p + i);
 
@@ -24,9 +22,8 @@ void dump_packet(char *tx_rx, char *p, int start, int len)
 
 		sprintf(buff + pre + pos * 3, "%02x ", c);
 
-		if ((pos == 15) || (i == len -1))
+		if ((pos == 15) || (i == (len2 - 1)))
 			printf("%s\n", buff);
 	}		
-#endif
 }
 

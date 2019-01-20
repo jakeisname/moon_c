@@ -32,7 +32,7 @@ typedef struct {
 	int trans_id;
 	msg_type_t msg_type;
 	int msg_len;	/* data length, ex) msg1_t = 8 */
-#define MAX_DATA_SIZE 64
+#define MAX_DATA_SIZE 64000
 	char data[MAX_DATA_SIZE];
 } message_t;
 

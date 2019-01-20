@@ -251,7 +251,6 @@ int send_to_peer(peer_t *peer)
 	tot_n = peer->tx_bytes;
 	peer->tx_bytes += n;
 
-
 	if (peer->tx_bytes >= tot_len)
 		peer->tx_bytes = -1;
 

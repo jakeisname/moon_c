@@ -31,6 +31,8 @@ static int connect_server(peer_t *client, char *server_ip, int server_port)
 
 	if (connect(client->socket, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) != 0) {
 		perror("connect()");
+		close(client->socket);
+		client->socket = NO_SOCKET;
 		return -1;
 	}
 
