@@ -15,7 +15,7 @@ static int connect_server(peer_t *client, char *server_ip, int server_port)
 	struct sockaddr_in server_addr;
 
 	// create socket
-	client->socket = socket(AF_INET, SOCK_STREAM, 0);
+	client->socket = socket(PF_INET, SOCK_STREAM, 0);
 	if (client->socket < 0) {
 		perror("socket()");
 		return -1;
@@ -36,7 +36,7 @@ static int connect_server(peer_t *client, char *server_ip, int server_port)
 		return -1;
 	}
 
-	printf("Connected to %s:%d.\n", server_ip, server_port);
+	printf("Connected to %s:%d\n", server_ip, server_port);
 
 	return 0;
 }

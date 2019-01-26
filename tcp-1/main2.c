@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 	char *server_ip = SERVER_IPV4_ADDR;
 	int port = DEFAULT_PORT;	
 
-	const char *optstring = "c:p:d"; 
+	const char *optstring = "c:p:dt"; 
 	char option; 
 
 	optind = 1; 
