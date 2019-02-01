@@ -15,6 +15,8 @@
 #define SERVER_IPV4_ADDR "0.0.0.0"
 #define DEFAULT_PORT 	 2000
 
+#define PACKED __attribute__((packed))
+
 /* message */
 
 typedef enum {
@@ -34,23 +36,23 @@ typedef struct {
 	int msg_len;	/* data length, ex) msg1_t = 8 */
 #define MAX_DATA_SIZE 64
 	char data[MAX_DATA_SIZE];
-} message_t;
+} PACKED message_t;
 
 typedef struct {
 	int a;
 	int b;
-} data1_t;
+} PACKED data1_t;
 
 typedef struct {
 	int a;
 	int b;
 	int c;
-} data2_t;
+} PACKED data2_t;
 
 typedef struct {
 #define MAX_TEXT_SIZE 32
 	char text[MAX_TEXT_SIZE];
-} data3_t;
+} PACKED data3_t;
 
 /* message queue */
 
