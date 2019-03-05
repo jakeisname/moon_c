@@ -1,5 +1,5 @@
 # moon_c
-문c 블로그 with ARM64 Linux Kernel 4.x
+문c 블로그 with ARM64 Linux Kernel 5.x
 http://jake.dothome.co.kr
 
 * char
