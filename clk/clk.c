@@ -162,7 +162,7 @@ static ssize_t foo2_store(struct device_driver *driver,
 		const char *buf, size_t len)
 {
 	sscanf(buf, "%d", &foo2);
-	if (foo2)
+	if (foo2 > 9)
 		set_rate_foo2(&_foo->pdev->dev, foo2);
 	return sizeof(int);
 }
@@ -177,7 +177,7 @@ static ssize_t foo3_store(struct device_driver *driver,
 		const char *buf, size_t len)
 {
 	sscanf(buf, "%d", &foo3);
-	if (foo3)
+	if (foo3 > 9)
 		set_rate_foo3(&_foo->pdev->dev, foo3);
 	return sizeof(int);
 }
@@ -192,7 +192,7 @@ static ssize_t foo4_store(struct device_driver *driver,
 		const char *buf, size_t len)
 {
 	sscanf(buf, "%d", &foo4);
-	if (foo4)
+	if (foo4 > 9)
 		set_rate_foo4(&_foo->pdev->dev, foo4);
 	return sizeof(int);
 }

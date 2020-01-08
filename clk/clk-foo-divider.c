@@ -286,17 +286,9 @@ static int foo_clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
 	val |= value << divider->shift;
 	foo_writel(val, &divider->reg);
 
-	// ti_clk_latch(&divider->reg, divider->latch);
-
 	return 0;
 }
 
-/**
- * clk_divider_save_context - Save the divider value
- * @hw: pointer  struct clk_hw
- *
- * Save the divider value
- */
 static int clk_divider_save_context(struct clk_hw *hw)
 {
 	struct foo_divider *divider = to_foo_divider(hw);
@@ -310,12 +302,6 @@ static int clk_divider_save_context(struct clk_hw *hw)
 	return 0;
 }
 
-/**
- * clk_divider_restore_context - restore the saved the divider value
- * @hw: pointer  struct clk_hw
- *
- * Restore the saved the divider value
- */
 static void clk_divider_restore_context(struct clk_hw *hw)
 {
 	struct foo_divider *divider = to_foo_divider(hw);
@@ -367,7 +353,6 @@ static struct clk *_register_divider(struct device *dev, const char *name,
 	init.num_parents = (parent_name ? 1 : 0);
 
 	/* struct clk_divider assignments */
-	// memcpy(&div->reg, reg, sizeof(*reg));
 	div->shift = shift;
 	div->width = width;
 	div->latch = latch;
@@ -483,13 +468,6 @@ static int __init foo_clk_divider_populate(struct device_node *node,
 	u32 *flags, u8 *div_flags, u8 *width, u8 *shift, s8 *latch)
 {
 	u32 val;
-
-#if 0
-	/* reg = < >; */
-	ret = ti_clk_get_reg_addr(node, 0, reg);
-	if (ret)
-		return ret;
-#endif
 
 	if (!of_property_read_u32(node, "foo,bit-shift", &val))
 		*shift = val;
