@@ -252,7 +252,7 @@ static long foo_clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
 	div = foo_clk_divider_bestdiv(hw, rate, prate);
 	round = DIV_ROUND_UP(*prate, div);
 
-	printk("%s: rate=%lu, prate=%lu, round=%l\n", __func__, rate, *prate, round);
+	printk("%s: rate=%lu, prate=%lu, round=%ld\n", __func__, rate, *prate, round);
 
 	return round;
 }
