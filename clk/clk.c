@@ -22,6 +22,7 @@ typedef struct foo_data {
 	struct clk *clk2;
 	struct clk *clk3;
 	struct clk *clk4;
+	struct clk *clk5;
 } foo_data_t;
 
 foo_data_t *_foo;
@@ -33,6 +34,7 @@ int foo1 = 1000000;
 int foo2 = 0;
 int foo3 = 0;
 int foo4 = 0;
+int foo5 = 0;
 
 void foo_open(struct device *dev)
 {
@@ -51,7 +53,7 @@ void foo_open(struct device *dev)
 
 	_foo->clk2 = devm_clk_get(dev, "fooclk2");
 	if (IS_ERR(_foo->clk2)) {
-		dev_err(dev, "devm_clk_get() fooclk3 error \n");
+		dev_err(dev, "devm_clk_get() fooclk2 error \n");
 		_foo->clk2 = NULL;
 		return;
 	}
@@ -73,12 +75,35 @@ void foo_open(struct device *dev)
 	}
 	dev_info(dev, "devm_clk_get() clk4\n");
 
+	_foo->clk5 = devm_clk_get(dev, "fooclk5");
+	if (IS_ERR(_foo->clk5)) {
+		dev_err(dev, "devm_clk_get() fooclk5 error \n");
+		_foo->clk5 = NULL;
+		return;
+	}
+	dev_info(dev, "devm_clk_get() clk5\n");
+
+	rc = clk_prepare(_foo->clk1);
+	dev_info(dev, "clk_prepare() clk1 rc=%d\n", rc);
 	rc = clk_prepare(_foo->clk2);
 	dev_info(dev, "clk_prepare() clk2 rc=%d\n", rc);
 	rc = clk_prepare(_foo->clk3);
 	dev_info(dev, "clk_prepare() clk3 rc=%d\n", rc);
 	rc = clk_prepare(_foo->clk4);
 	dev_info(dev, "clk_prepare() clk4 rc=%d\n", rc);
+	rc = clk_prepare(_foo->clk5);
+	dev_info(dev, "clk_prepare() clk5 rc=%d\n", rc);
+
+	rc = clk_enable(_foo->clk1);
+	dev_info(dev, "clk_enable() clk1 rc=%d\n", rc);
+	rc = clk_enable(_foo->clk2);
+	dev_info(dev, "clk_enable() clk2 rc=%d\n", rc);
+	rc = clk_enable(_foo->clk3);
+	dev_info(dev, "clk_enable() clk3 rc=%d\n", rc);
+	rc = clk_enable(_foo->clk4);
+	dev_info(dev, "clk_enable() clk4 rc=%d\n", rc);
+	rc = clk_enable(_foo->clk5);
+	dev_info(dev, "clk_enable() clk5 rc=%d\n", rc);
 }
 
 void foo_close(struct device *dev)
@@ -86,13 +111,30 @@ void foo_close(struct device *dev)
 	if (!_foo)
 		return;
 
+	clk_disable(_foo->clk5);
+	dev_info(dev, "clk_disable() clk5\n");
+	clk_disable(_foo->clk4);
+	dev_info(dev, "clk_disable() clk4\n");
+	clk_disable(_foo->clk3);
+	dev_info(dev, "clk_disable() clk3\n");
+	clk_disable(_foo->clk2);
+	dev_info(dev, "clk_disable() clk2\n");
+	clk_disable(_foo->clk1);
+	dev_info(dev, "clk_disable() clk1\n");
+
+	clk_unprepare(_foo->clk5);
+	dev_info(dev, "clk_unprepare() clk5 \n");
 	clk_unprepare(_foo->clk4);
 	dev_info(dev, "clk_unprepare() clk4 \n");
 	clk_unprepare(_foo->clk3);
 	dev_info(dev, "clk_unprepare() clk3 \n");
 	clk_unprepare(_foo->clk2);
 	dev_info(dev, "clk_unprepare() clk2 \n");
+	clk_unprepare(_foo->clk1);
+	dev_info(dev, "clk_unprepare() clk1 \n");
 
+	devm_clk_put(dev, _foo->clk5);
+	dev_info(dev, "devm_clk_put() clk5 \n");
 	devm_clk_put(dev, _foo->clk4);
 	dev_info(dev, "devm_clk_put() clk4 \n");
 	devm_clk_put(dev, _foo->clk3);
@@ -135,6 +177,38 @@ void set_rate_foo4(struct device *dev, int val)
 
 	rc = clk_set_rate(_foo->clk4, val);
 	dev_info(dev, "clk_set_rate() clk4 val=%d rc=%d\n", val, rc);
+}
+
+void set_parent_foo5(struct device *dev, int val)
+{
+	int rc;
+	int val2 = val + 1;
+	struct clk* clk;
+
+	if (!_foo)
+		return;
+
+	switch (val) {
+		case 0 : 
+			clk = _foo->clk1;
+			break;
+		case 1 : 
+			clk = _foo->clk2;
+			break;
+		case 2 : 
+			clk = _foo->clk3;
+			break;
+		case 3 : 
+			clk = _foo->clk4;
+			break;
+		default : 
+			clk = _foo->clk1;
+			val2 = 1;
+			break;
+	}
+
+	rc = clk_set_parent(_foo->clk5, clk);
+	dev_info(dev, "clk_set_parent() val=%d, select=clk%d rc=%d\n", val, val2, rc);
 }
 
 static ssize_t foo1_show(struct device_driver *driver,  
@@ -197,15 +271,33 @@ static ssize_t foo4_store(struct device_driver *driver,
 	return sizeof(int);
 }
 
+static ssize_t foo5_show(struct device_driver *driver,  
+		char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", foo5);
+}
+
+static ssize_t foo5_store(struct device_driver *driver,
+		const char *buf, size_t len)
+{
+	sscanf(buf, "%d", &foo5);
+	if (foo5 < 4)
+		set_parent_foo5(&_foo->pdev->dev, foo5);
+	return sizeof(int);
+}
+
 static DRIVER_ATTR_RW(foo1);
 static DRIVER_ATTR_RW(foo2);
 static DRIVER_ATTR_RW(foo3);
 static DRIVER_ATTR_RW(foo4);
+static DRIVER_ATTR_RW(foo5);
+
 static struct attribute *foo_driver_attrs[] = {
 	&driver_attr_foo1.attr,
 	&driver_attr_foo2.attr,
 	&driver_attr_foo3.attr,
 	&driver_attr_foo4.attr,
+	&driver_attr_foo5.attr,
 	NULL
 };
 ATTRIBUTE_GROUPS(foo_driver);

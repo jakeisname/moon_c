@@ -1,4 +1,4 @@
-obj-m := clk.o mux.o
+obj-m := clk.o
 
 KER := $(shell uname -r)
 #KER_DIR := /usr/src/linux-headers-5.0.0+
