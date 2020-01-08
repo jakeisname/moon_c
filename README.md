@@ -9,6 +9,8 @@ http://jake.dothome.co.kr
 * clk 디렉토리
   - clk-foo-divider.c
     - compatible = "foo,divider-clock" 클럭 소스로 커널 컴파일 시 포함(inbuild) 되어야 함.
+  - clk-foo-mux.c
+    - compatible = "foo,mux-clock" 클럭 소스로 커널 컴파일 시 포함(inbuild) 되어야 함.
   - clk.c
     - 위 클럭 드라이버를 사용한 사용자 샘플
   
