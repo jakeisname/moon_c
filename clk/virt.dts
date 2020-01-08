@@ -378,10 +378,18 @@
 		foo,index-power-of-two;
 	};
 
+	fooclk5 {
+		phandle = <0x8500>;
+		clock-output-names = "fooclk5";
+		clocks = <0x8100 0x8200 0x8300 0x8400>;
+		#clock-cells = <0x0>;
+		compatible = "foo,mux-clock";
+	};
+
 	foo {
 		compatible = "foo,foo";
-		clock-names = "fooclk1", "fooclk2", "fooclk3", "fooclk4";
-		clocks = <0x8100 0x8200 0x8300 0x8400>;
+		clock-names = "fooclk1", "fooclk2", "fooclk3", "fooclk4", "fooclk5";
+		clocks = <0x8100 0x8200 0x8300 0x8400 0x8500>;
 	};
 
 	i2c {

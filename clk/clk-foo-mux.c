@@ -4,7 +4,6 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/clk/ti.h>
-#include "clock.h"
 
 struct foo_mux {
         struct clk_hw           hw;
@@ -62,6 +61,8 @@ static u8 foo_clk_mux_get_parent(struct clk_hw *hw)
 	if (val >= num_parents)
 		return -EINVAL;
 
+       	printk("%s: val=%u\n", __func__, val);
+
 	return val;
 }
 
@@ -69,6 +70,8 @@ static int foo_clk_mux_set_parent(struct clk_hw *hw, u8 index)
 {
 	struct foo_mux *mux = to_foo_mux(hw);
 	u32 val;
+
+       	printk("%s: index=%u\n", __func__, index);
 
 	if (mux->table) {
 		index = mux->table[index];
@@ -89,6 +92,8 @@ static int foo_clk_mux_set_parent(struct clk_hw *hw, u8 index)
 	val |= index << mux->shift;
 	foo_writel(val, &mux->reg);
 
+       	printk("%s: index2=%u, val=%u\n", __func__, index, val);
+
 	return 0;
 }
 
@@ -96,13 +101,18 @@ static int clk_mux_save_context(struct clk_hw *hw)
 {
 	struct foo_mux *mux = to_foo_mux(hw);
 
+       	printk("%s: \n", __func__);
+
 	mux->saved_parent = foo_clk_mux_get_parent(hw);
+
 	return 0;
 }
 
 static void clk_mux_restore_context(struct clk_hw *hw)
 {
 	struct foo_mux *mux = to_foo_mux(hw);
+
+       	printk("%s: \n", __func__);
 
 	foo_clk_mux_set_parent(hw, mux->saved_parent);
 }
@@ -144,7 +154,7 @@ static struct clk *_register_mux(struct device *dev, const char *name,
 	mux->table = table;
 	mux->hw.init = &init;
 
-	clk = foo_clk_register(dev, &mux->hw, name);
+	clk = clk_register(dev, &mux->hw);
 
 	if (IS_ERR(clk))
 		kfree(mux);
@@ -155,7 +165,6 @@ static struct clk *_register_mux(struct device *dev, const char *name,
 static void of_mux_clk_setup(struct device_node *node)
 {
 	struct clk *clk;
-	struct clk_omap_reg reg;
 	unsigned int num_parents;
 	const char **parent_names;
 	u8 clk_mux_flags = 0;
