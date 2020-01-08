@@ -6,6 +6,9 @@ http://jake.dothome.co.kr
   - new_gpio_api.c  gpio 캐릭터 디바이스로 gpio 핀 제어 테스트 샘플  (파일을 직접 열고 ioctl로 제어)
   - new_gpio_api2.c  gpio 캐릭터 디바이스로 gpio 핀 제어 테스트 샘플 (gpiod api 사용)
   
+* clk 디렉토리
+  - clk-foo-divider.c
+    - compatible = "foo,divider-clock" 클럭 소스로 커널 컴파일 시 포함(inbuild) 되어야 함.
   
 * device-1 디렉토리
   - foo.c         
