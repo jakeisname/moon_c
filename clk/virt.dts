@@ -392,6 +392,71 @@
 		clocks = <0x8100 0x8200 0x8300 0x8400 0x8500>;
 	};
 
+	clk_f1: clk_f1 {
+		clock-output-names = "clk_f1";
+		clock-frequency = <10000000>;
+		#clock-cells = <0x0>;
+		compatible = "fixed-clock";
+	};
+
+	clk_f2: clk_f2 {
+		clock-output-names = "clk_f2";
+		compatible = "fixed-factor-clock";
+                clocks = <&clk_f1>;
+                clock-div = <5>;
+                clock-mult = <4>;
+		#clock-cells = <0x0>;
+	};
+
+	clk_d1: clk_d1 {
+		clock-output-names = "clk_d1";
+		clocks = <&clk_f2>;
+		#clock-cells = <0x0>;
+		compatible = "foo,divider-clock2";
+		foo,width = <4>;
+	};
+
+	clk_d2: clk_d2 {
+		clock-output-names = "clk_d2";
+		clocks = <&clk_d1>;
+		#clock-cells = <0x0>;
+		compatible = "foo,divider-clock2";
+		foo,set-rate-parent;
+		foo,width = <3>;
+	};
+
+	clk_d3: clk_d3 {
+		clock-output-names = "clk_d3";
+		clocks = <&clk_d2>;
+		#clock-cells = <0x0>;
+		compatible = "foo,divider-clock2";
+		foo,index-power-of-two;
+		foo,width = <3>;
+	};
+
+	clk_d4: clk_d4 {
+		clock-output-names = "clk_d4";
+		clocks = <&clk_d2>;
+		#clock-cells = <0x0>;
+		compatible = "foo,divider-clock2";
+		foo,index-power-of-two;
+		foo,width = <4>;
+	};
+
+	clk_d5: clk_d5 {
+		clock-output-names = "clk_d5";
+		clocks = <&clk_d1>;
+		#clock-cells = <0x0>;
+		compatible = "foo,divider-clock2";
+		foo,width = <4>;
+	};
+
+	foo22 {
+		compatible = "foo,foo22";
+		clock-names = "clk_f1", "clk_f2", "clk_d1", "clk_d2", "clk_d3", "clk_d4", "clk_d5";
+		clocks = <&clk_f1 &clk_f2 &clk_d1 &clk_d2 &clk_d3 &clk_d4 &clk_d5>;
+	};
+
 	i2c {
 		compatible = "foo,foo-i2c";
 		#address-cells = <1>;
