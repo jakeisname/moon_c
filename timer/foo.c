@@ -31,6 +31,7 @@ static void __exit foo_exit(void)
 {
 	printk("%s:\n", __func__);
 	del_timer(t);
+	kfree(t);
 }
 
 module_init(foo_init);
