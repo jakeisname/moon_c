@@ -1,7 +1,7 @@
-obj-m := clk2.o
+obj-m := foo.o
 
 KER := $(shell uname -r)
-#KER_DIR := /usr/src/linux-headers-5.0.0+
+#KER_DIR := ~/workspace/lsk-4.14
 KER_DIR := /lib/modules/$(KER)/build
 
 all:
