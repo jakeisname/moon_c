@@ -1,1 +1,0 @@
-cmd_/root/workspace/moon_c/dma/dma.ko := ld -EL -r  -maarch64linux -T ./scripts/module-common.lds --build-id  -o /root/workspace/moon_c/dma/dma.ko /root/workspace/moon_c/dma/dma.o /root/workspace/moon_c/dma/dma.mod.o ;  true
