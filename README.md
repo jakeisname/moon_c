@@ -1,11 +1,18 @@
 # moon_c
-문c 블로그 with ARM64 Linux Kernel 4.x
+문c 블로그 with ARM64 Linux Kernel 5.x
 http://jake.dothome.co.kr
 
 * char
   - new_gpio_api.c  gpio 캐릭터 디바이스로 gpio 핀 제어 테스트 샘플  (파일을 직접 열고 ioctl로 제어)
   - new_gpio_api2.c  gpio 캐릭터 디바이스로 gpio 핀 제어 테스트 샘플 (gpiod api 사용)
   
+* clk 디렉토리
+  - clk-foo-divider.c
+    - compatible = "foo,divider-clock" 클럭 소스로 커널 컴파일 시 포함(inbuild) 되어야 함.
+  - clk-foo-mux.c
+    - compatible = "foo,mux-clock" 클럭 소스로 커널 컴파일 시 포함(inbuild) 되어야 함.
+  - clk.c
+    - 위 클럭 드라이버를 사용한 사용자 샘플
   
 * device-1 디렉토리
   - foo.c         
@@ -101,3 +108,9 @@ http://jake.dothome.co.kr
     - ivshmem pci 디바이스를 사용한 가상 gpio 컨트롤러 구현
     - chained irq & nested irq test for legacy IRQx 
     - MSI-x enable  
+
+* tcp-1 디렉토리
+  - tcp server example (select 사용, queue 및 예외 처리 로직 등을 추가하여 실전 서버 소켓과 유사하게 구현)
+  - telnet과 연동 테스트용
+  - 실전 서버에는 이 샘플 코드 외에 구조체 전송, magic number 및 seq_id 비교 로직등이 추가 구현됨.
+ 
