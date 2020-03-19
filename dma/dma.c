@@ -17,10 +17,10 @@ dma_addr_t phys1;
 dma_addr_t phys2;
 dma_addr_t phys3;
 dma_addr_t phys4;
-struct page *p1;
-void *p2;
-void *p3;
-void *p4;
+void *virt1;
+void *virt2;
+void *virt3;
+void *virt4;
 
 static int foo_probe(struct platform_device *pdev)
 { 
@@ -29,17 +29,17 @@ static int foo_probe(struct platform_device *pdev)
 
         dev_info(dev, "%s\n", __func__);
 
-//	p1 = dma_alloc_contiguous(dev, pages, GFP_KERNEL);
-//	dev_info(dev, "p1=%llx\n", (long long) (void *) p1);
+//	virt1 = dma_alloc_wc(dev, pages, &phys1, GFP_KERNEL);
+//	dev_info(dev, "virt1=0x%llx, phys1=0x%llx\n", (long long) virt1, phys1);
 
-	p2 = dmam_alloc_coherent(dev, pages, &phys2, GFP_KERNEL);
-	dev_info(dev, "p2=%llx\n", (long long) p2);
+	virt2 = dmam_alloc_coherent(dev, pages, &phys2, GFP_KERNEL);
+	dev_info(dev, "virt2=0x%llx, phys2=0x%llx\n", (long long) virt2, phys2);
 	
-	p3 = dmam_alloc_attrs(dev, pages, &phys3, GFP_KERNEL, DMA_ATTR_WRITE_COMBINE);
-	dev_info(dev, "p3=%llx\n", (long long) p3);
+	virt3 = dmam_alloc_attrs(dev, pages, &phys3, GFP_KERNEL, DMA_ATTR_WRITE_COMBINE);
+	dev_info(dev, "virt3=0x%llx, phys3=0x%llx\n", (long long) virt3, phys3);
 
-	p4 = dmam_alloc_attrs(dev, pages, &phys4, GFP_KERNEL, DMA_ATTR_NO_KERNEL_MAPPING);
-	dev_info(dev, "p4=%llx\n", (long long) p4);
+	virt4 = dmam_alloc_attrs(dev, pages, &phys4, GFP_KERNEL, DMA_ATTR_NO_KERNEL_MAPPING);
+	dev_info(dev, "virt4=0x%llx, phys4=0x%llx\n", (long long) virt4, phys4);
 
         return 0;     /* 0=success */
 }
