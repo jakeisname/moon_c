@@ -114,3 +114,5 @@ http://jake.dothome.co.kr
   - telnet과 연동 테스트용
   - 실전 서버에는 이 샘플 코드 외에 구조체 전송, magic number 및 seq_id 비교 로직등이 추가 구현됨.
  
+* foo-proc 디렉토리
+  - proc 구현 샘플
