@@ -116,3 +116,6 @@ http://jake.dothome.co.kr
  
 * foo-proc 디렉토리
   - proc 구현 샘플
+
+* kernel_threadd 디렉토리
+  - FIFO 또는 RR rt 커널 스레드 샘플
