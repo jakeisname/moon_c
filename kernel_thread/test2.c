@@ -7,8 +7,8 @@ int main()
 	while (1) {
 		x++;
 
-		if (!(x % 100000000))
-			printf("x=%ld\n", x);
+//		if (!(x % 100000000))
+//			printf("x=%ld\n", x);
 	}
 }
 
