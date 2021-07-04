@@ -119,3 +119,5 @@ http://jake.dothome.co.kr
 
 * kernel_threadd 디렉토리
   - FIFO 또는 RR rt 커널 스레드 샘플
+* hello_module 디렉토리
+  - hello 모듈 샘플
