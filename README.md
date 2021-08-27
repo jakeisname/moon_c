@@ -125,3 +125,6 @@ http://jake.dothome.co.kr
 
 * test/provider 디렉토리
   - barrier test for user application
+
+* file-1
+  - 커널에서 유저용 파일 기록(비권장)
