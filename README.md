@@ -67,7 +67,7 @@ http://jake.dothome.co.kr
     - gpio 컨트롤러에 legacy 인터럽트 연동 샘플-2 
     - 디바이스트리에서 다수의 gpio controller 드라이버 지정 가능
     - 가상 gpio 레지스터 시뮬레이션    
-- virt.dts
+  - virt.dts
     - gpio2용 gpio0 & gpio1 노드 추가
   
 * foo-gpio-pci 디렉토리
@@ -115,6 +115,9 @@ http://jake.dothome.co.kr
   - 실전 서버에는 이 샘플 코드 외에 구조체 전송, magic number 및 seq_id 비교 로직등이 추가 구현됨.
  
 * foo-proc 디렉토리
+  - proc 구현 샘플(시퀀스 사용)
+
+* foo-proc2 디렉토리
   - proc 구현 샘플
 
 * kernel_threadd 디렉토리
