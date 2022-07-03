@@ -1,5 +1,8 @@
 
-/* ref: https://lkw.readthedocs.io/en/latest/doc/05_proc_interface.html */
+/* ref: https://lkw.readthedocs.io/en/latest/doc/05_proc_interface.html 
+ *
+ * tested on kernel v5.15 
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -11,6 +14,7 @@
 #include <asm/types.h>
 #include <linux/version.h>
 
+
 #define DATA_SIZE 10
 #define MY_PROC_ENTRY "foo"
 #define PROC_FULL_PATH "/proc/foo"
@@ -19,7 +23,8 @@ struct proc_dir_entry *proc;
 int foo_len;
 char *msg = NULL;
 
-static ssize_t foo_write(struct file *filp, const char __user * buffer, size_t count, loff_t *pos)
+static ssize_t foo_write(struct file *filp, 
+		const char __user * buffer, size_t count, loff_t *pos)
 {
     char *data = PDE_DATA(file_inode(filp));
 
@@ -46,7 +51,8 @@ static ssize_t foo_write(struct file *filp, const char __user * buffer, size_t c
     return count;
 }
 
-ssize_t foo_read(struct file *filp, char __user *buf, size_t count, loff_t *offp)
+ssize_t foo_read(struct file *filp, char __user *buf, 
+		size_t count, loff_t *offp)
 {
     int err;
     char *data = PDE_DATA(file_inode(filp));
