@@ -4,14 +4,25 @@
 #include "foo.h"
 #include "proc.h"
 
-// #define USE_SINGLE_OPEN
+/* All proc interface methods implemented in this sample use 
+ * sequence operations.
+ * Please see the foo-proc2 directory for other proc standard
+ * implementations.
+ *
+ * tested on kernel v5.15
+ */
+
+#define PROC_CREATE			1
+#define PROC_CREATE_AND_SINGLE_OPEN	2
+#define PROC_CREATE_SEQ			3
+
+#define IMPL	PROC_CREATE
 
 /*--------------------------------------------------------*/
 /* 1) seq_file operations part                            */
 /*--------------------------------------------------------*/
 
-#ifdef USE_SINGLE_OPEN
-#else
+#if (IMPL == PROC_CREATE) || (IMPL == PROC_CREATE_SEQ)
 static void *foo_seq_start(struct seq_file *s, loff_t *pos)
 {
 	printk(KERN_INFO "%s", __func__);
@@ -57,7 +68,7 @@ static const struct seq_operations foo_seq_ops = {
 /* 2) proc operations part                                */
 /*--------------------------------------------------------*/
 
-#ifdef USE_SINGLE_OPEN
+#if (IMPL == PROC_CREATE_AND_SINGLE_OPEN)
 static int foo_simple_show(struct seq_file *s, void *unused)
 {
 	struct foo_info *info;
@@ -69,16 +80,18 @@ static int foo_simple_show(struct seq_file *s, void *unused)
 }
 #endif
 
+#if (IMPL == PROC_CREATE) || (IMPL == PROC_CREATE_AND_SINGLE_OPEN)
 static int foo_proc_open(struct inode *inode, struct file *file)
 {
-#ifdef USE_SINGLE_OPEN
+#if (IMPL == PROC_CREATE_AND_SINGLE_OPEN)
 	return single_open(file, foo_simple_show, NULL);
 #else
 	return seq_open(file, &foo_seq_ops);
 #endif
 }
+#endif
 
-
+#if (IMPL == PROC_CREATE) || (IMPL == PROC_CREATE_AND_SINGLE_OPEN)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
 struct proc_ops foo_proc_ops = {
 	.proc_open	= foo_proc_open,
@@ -95,6 +108,7 @@ static const struct file_operations foo_proc_ops = {
 	.release        = seq_release,
 };
 #endif
+#endif
 
 /*--------------------------------------------------------*/
 /* 3) proc interface part  (/proc/foo-dir/foo)            */
@@ -109,21 +123,24 @@ static struct proc_dir_entry *foo_proc_file = NULL;
 int foo_proc_init(void)
 {
 	foo_proc_dir = proc_mkdir(FOO_DIR, NULL);
-	if (foo_proc_dir == NULL)
-	{
+	if (foo_proc_dir == NULL) {
 		printk("Unable to create /proc/%s\n", FOO_DIR);
 		return -1;
 	}
 
+#if (IMPL == PROC_CREATE) || (IMPL == PROC_CREATE_AND_SINGLE_OPEN)
 	foo_proc_file = proc_create(FOO_FILE, 0, foo_proc_dir, &foo_proc_ops); /* S_IRUGO */
-	if (foo_proc_file == NULL)
-	{
+#else
+	foo_proc_file = proc_create_seq(FOO_FILE, 0, foo_proc_dir, &foo_seq_ops); /* S_IRUGO */
+#endif
+	if (foo_proc_file == NULL) {
 		printk("Unable to create /proc/%s/%s\n", FOO_DIR, FOO_FILE);
 		remove_proc_entry(FOO_DIR, NULL);
 		return -1;
 	}
 
 	printk(KERN_INFO "Created /proc/%s/%s\n", FOO_DIR, FOO_FILE);
+
 	return 0;
 }
 
@@ -136,10 +153,6 @@ void foo_proc_exit(void)
 #else
 	remove_proc_subtree(FOO_DIR, NULL);
 #endif
-
-	/* remove proc_dir_entry instance */
-	//proc_remove(foo_proc_file);
-	//proc_remove(foo_proc_dir);
 
 	printk(KERN_INFO "Removed /proc/%s/%s\n", FOO_DIR, FOO_FILE);
 }
