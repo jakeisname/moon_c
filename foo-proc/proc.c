@@ -79,6 +79,14 @@ static int foo_proc_open(struct inode *inode, struct file *file)
 }
 
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+struct proc_ops foo_proc_ops = {
+	.proc_open	= foo_proc_open,
+	.proc_read	= seq_read,
+	.proc_lseek     = seq_lseek,
+	.proc_release   = seq_release,
+};
+#else
 static const struct file_operations foo_proc_ops = {
 	.owner          = THIS_MODULE,
 	.open           = foo_proc_open,
@@ -86,6 +94,7 @@ static const struct file_operations foo_proc_ops = {
 	.llseek         = seq_lseek,
 	.release        = seq_release,
 };
+#endif
 
 /*--------------------------------------------------------*/
 /* 3) proc interface part  (/proc/foo-dir/foo)            */
