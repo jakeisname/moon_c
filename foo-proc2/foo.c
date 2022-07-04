@@ -23,13 +23,14 @@
 static char *foo1_str = NULL;
 static int foo1_len;
 
-static ssize_t foo1_write(struct file *filp, 
-		const char __user *ubuf, size_t count, loff_t *pos)
+static ssize_t proc_str_write(struct file *filp, 
+		const char __user *ubuf, size_t count, loff_t *pos,
+		char *dest, int *str_len)
 {
 	char *data = PDE_DATA(file_inode(filp));
 
-	pr_info("%s(%d): count=%lu, pos=%lld, old foo_len=%d\n", 
-			__func__, __LINE__, count, *pos, foo1_len);
+	pr_info("%s(%d): count=%lu, pos=%lld, old str_len=%d\n", 
+			__func__, __LINE__, count, *pos, *str_len);
 
 	if (count > BUF_SIZE) {
 		return -EFAULT;
@@ -41,27 +42,28 @@ static ssize_t foo1_write(struct file *filp,
 
 	data[count] = '\0';
 
-	pr_info("set new foo=%s", data);
+	pr_info("set new val=%s", data);
 
-	foo1_len = count - 1;
+	*str_len = count - 1;
 	*pos = (int) count;
 
-	pr_info("%s(%d): count=%lu, pos=%lld, new foo_len=%d\n", 
-			__func__, __LINE__, count, *pos, foo1_len);
+	pr_info("%s(%d): count=%lu, pos=%lld, new str_len=%d\n", 
+			__func__, __LINE__, count, *pos, *str_len);
 	return count;
 }
 
-static ssize_t foo1_read(struct file *filp, char __user *buf, 
-		size_t count, loff_t *offp)
+static ssize_t proc_str_read(struct file *filp, char __user *ubuf, 
+		size_t count, loff_t *offp,
+		char *dest, int str_len)
 {
 	int err;
 	char *data = PDE_DATA(file_inode(filp));
 	int len;
 
-	pr_info("%s(%d): count=%lu, offp=%lld, foo_len=%d\n", 
-			__func__, __LINE__, count, *offp, foo1_len);
+	pr_info("%s(%d): count=%lu, offp=%lld, str_len=%d\n", 
+			__func__, __LINE__, count, *offp, str_len);
 
-	if ((int) (*offp) > foo1_len) {
+	if ((int) (*offp) > str_len) {
 		return 0;
 	}
 
@@ -73,8 +75,8 @@ static ssize_t foo1_read(struct file *filp, char __user *buf,
 		return count;	/* read 0 size, nothing to do */
 	} 
 
-	len = foo1_len + 1;	/* +1 to read the \0 */
-	err = copy_to_user(buf, data, len);	/* +1 for \0 */
+	len = str_len + 1;	/* +1 to read the \0 */
+	err = copy_to_user(ubuf, data, len);	/* +1 for \0 */
 	if (err) {
 		pr_info("Error in copying data.");
 	}
@@ -84,20 +86,33 @@ static ssize_t foo1_read(struct file *filp, char __user *buf,
 	return len;
 }
 
+static ssize_t foo1_write(struct file *filp, 
+		const char __user *ubuf, size_t count, loff_t *pos)
+{
+	return proc_str_write(filp, ubuf, count, pos, foo1_str, &foo1_len);
+}
+
+static ssize_t foo1_read(struct file *filp, char __user *buf, 
+		size_t count, loff_t *offp)
+{
+	return proc_str_read(filp, buf, count, offp, foo1_str, foo1_len);
+}
+
+
 static char *foo2_str = NULL;
 static int foo2_int = 0;
 static int foo2_len;
 
 static ssize_t proc_int_write(struct file *filp, 
 		const char __user *ubuf, size_t count, loff_t *pos,
-		int *dest, int *dest_len)
+		int *dest, int *val_len)
 {
 	int num;
 	char *data = PDE_DATA(file_inode(filp));
 	int len;
 
-	pr_info("%s(%d): count=%lu, pos=%lld, old foo2_len=%d\n", 
-			__func__, __LINE__, count, *pos, foo2_len);
+	pr_info("%s(%d): count=%lu, pos=%lld, old val_len=%d\n", 
+			__func__, __LINE__, count, *pos, *val_len);
 
 	if (count > BUF_SIZE) {
 		return -EFAULT;
@@ -118,12 +133,12 @@ static ssize_t proc_int_write(struct file *filp,
 
 	pr_info("set new val=%d\n", *dest);
 
-	*dest_len = len - 1;
+	*val_len = len - 1;
 
 	*pos = (loff_t) len;
 
 	pr_info("%s(%d): count=%lu, pos=%lld, new val_len=%d\n", 
-			__func__, __LINE__, count, *pos, *dest_len);
+			__func__, __LINE__, count, *pos, *val_len);
 
 	return len;
 }
