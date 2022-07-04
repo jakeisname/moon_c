@@ -224,7 +224,6 @@ static int proc_create_str_and_init(char *name, umode_t mode,
 {
 	struct proc_dir_entry *f1;
 
-	pr_err("%s(%d): Jake\n", __func__, __LINE__);
 	data_str = kmalloc((size_t) BUF_SIZE, GFP_KERNEL);
 	if (data_str == NULL) {
 		goto err2;
@@ -266,7 +265,6 @@ static int proc_create_int_and_init(char *name, umode_t mode,
 {
 	struct proc_dir_entry *f1;
 
-	pr_err("%s(%d): Jake\n", __func__, __LINE__);
 	data_str = kmalloc((size_t) BUF_SIZE, GFP_KERNEL);
 	if (data_str == NULL) {
 		goto err2;
