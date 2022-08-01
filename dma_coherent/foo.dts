@@ -1,0 +1,30 @@
+{
+	...
+
+        reserved-memory {
+                #address-cells = <2>;
+                #size-cells = <2>;
+                ranges;
+
+                linux,cma {
+                        compatible = "shared-dma-pool";
+                        reusable;
+                        reg = <0x0 0x50000000 0x0 0x01000000>;
+                        linux,cma-default;
+                };
+
+                foo_mem: foo_mem {
+                        compatible = "shared-dma-pool";
+                        reg = <0x0 0x60000000 0x0 0x01000000>;
+                        alignment = <0 0x1000000>;
+                        no-map;
+                };
+        };
+
+	/* foo_dev use foo_mem */
+        foo_dev: foo_dev {
+              compatible = "foo,foo-dev";
+              memory-region = <&foo_mem>;
+        };
+};
+
