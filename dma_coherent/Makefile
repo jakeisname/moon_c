@@ -1,4 +1,4 @@
-obj-m := foo.o
+obj-m := foo.o foo2.o foo3.o
 KER := $(shell uname -r)
 #KER_DIR := ~/workspace/lsk-4.14
 KER_DIR := /lib/modules/$(KER)/build

@@ -47,6 +47,8 @@ static int foo_probe(struct platform_device *pdev)
 
 	memset(foo->virt_addr, 0xa0, 10);
 
+	printk("%s: writed\n", __func__);
+
 	return 0;
 }
 
@@ -62,20 +64,20 @@ static int foo_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id of_foo_match[] = {
-	        { .compatible = "foo,foo-dev", },
+	        { .compatible = "foo,foo-dev2", },
 		{},
 };
 MODULE_DEVICE_TABLE(of, of_foo_match);
 
-static struct platform_driver foo_driver = {
+static struct platform_driver foo_driver2 = {
 	.driver = {
-		.name = "foo_driver",
+		.name = "foo_driver2",
 		.of_match_table = of_match_ptr(of_foo_match),
 	},
 	.probe          = foo_probe,
 	.remove		= foo_remove,
 };
 
-module_platform_driver(foo_driver);
+module_platform_driver(foo_driver2);
 MODULE_LICENSE("GPL");
 

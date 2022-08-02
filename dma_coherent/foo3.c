@@ -31,9 +31,6 @@ static int foo_probe(struct platform_device *pdev)
 	foo->pdev = pdev;
 	platform_set_drvdata(pdev, foo);
 
-	/* select foo-dev's memory */
-	of_reserved_mem_device_init(&pdev->dev);
-
 	/* test for dma buffer allocation */
 	foo->virt_addr = dma_alloc_coherent(&pdev->dev, 100, &foo->dma_addr, GFP_KERNEL);
 	if (foo->virt_addr == NULL)
@@ -46,6 +43,8 @@ static int foo_probe(struct platform_device *pdev)
 			(uint64_t) foo->virt_addr);
 
 	memset(foo->virt_addr, 0xa0, 10);
+
+	printk("%s: writed\n", __func__);
 
 	return 0;
 }
@@ -62,20 +61,20 @@ static int foo_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id of_foo_match[] = {
-	        { .compatible = "foo,foo-dev", },
+	        { .compatible = "foo,foo-dev3", },
 		{},
 };
 MODULE_DEVICE_TABLE(of, of_foo_match);
 
-static struct platform_driver foo_driver = {
+static struct platform_driver foo_driver3 = {
 	.driver = {
-		.name = "foo_driver",
+		.name = "foo_driver3",
 		.of_match_table = of_match_ptr(of_foo_match),
 	},
 	.probe          = foo_probe,
 	.remove		= foo_remove,
 };
 
-module_platform_driver(foo_driver);
+module_platform_driver(foo_driver3);
 MODULE_LICENSE("GPL");
 

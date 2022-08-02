@@ -6,7 +6,7 @@
                 #size-cells = <2>;
                 ranges;
 
-                linux,cma {
+                cma_mem: linux,cma {
                         compatible = "shared-dma-pool";
                         reusable;
                         reg = <0x0 0x50000000 0x0 0x01000000>;
@@ -26,5 +26,15 @@
               compatible = "foo,foo-dev";
               memory-region = <&foo_mem>;
         };
+
+        foo_dev2: foo_dev2 {
+              compatible = "foo,foo-dev2";
+              memory-region = <&cma_mem>;
+        };
+
+        foo_dev3: foo_dev3 {
+              compatible = "foo,foo-dev3";
+        };
+
 };
 
