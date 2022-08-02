@@ -9,6 +9,8 @@
 #include <linux/dma-direct.h>
 #include <linux/of_reserved_mem.h>
 
+#define DMA_ALLOC_SIZE	(2 * 4096)
+
 struct foo {
 	struct platform_device *pdev;
 	void *virt_addr;
@@ -35,7 +37,8 @@ static int foo_probe(struct platform_device *pdev)
 	of_reserved_mem_device_init(&pdev->dev);
 
 	/* test for dma buffer allocation */
-	foo->virt_addr = dmam_alloc_coherent(&pdev->dev, 100, &foo->dma_addr, GFP_KERNEL);
+	foo->virt_addr = dmam_alloc_coherent(&pdev->dev, DMA_ALLOC_SIZE, 
+			&foo->dma_addr, GFP_KERNEL);
 	if (foo->virt_addr == NULL)
 		return -2;
 
@@ -44,11 +47,6 @@ static int foo_probe(struct platform_device *pdev)
 	printk("%s: dma=%llx, phys=%llx, virt=%llx\n", __func__, 
 			(uint64_t) foo->dma_addr, (uint64_t) foo->phys_addr, 
 			(uint64_t) foo->virt_addr);
-
-	memset(foo->virt_addr, 0xa0, 10);
-
-	printk("%s: writed\n", __func__);
-
 	return 0;
 }
 
@@ -56,7 +54,8 @@ static int foo_remove(struct platform_device *pdev)
 {
 	foo_t *foo = (foo_t *)platform_get_drvdata(pdev);
 
-	dmam_free_coherent(&pdev->dev, 100, foo->virt_addr, foo->dma_addr);
+	dmam_free_coherent(&pdev->dev, DMA_ALLOC_SIZE, 
+			foo->virt_addr, foo->dma_addr);
 
 	printk("%s\n", __func__);
 

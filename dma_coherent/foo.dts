@@ -27,14 +27,15 @@
               memory-region = <&foo_mem>;
         };
 
+	/* foo_dev2 use cma_mem */
         foo_dev2: foo_dev2 {
               compatible = "foo,foo-dev2";
               memory-region = <&cma_mem>;
         };
 
+	/* foo_dev3 use default cma */
         foo_dev3: foo_dev3 {
               compatible = "foo,foo-dev3";
         };
-
 };
 
