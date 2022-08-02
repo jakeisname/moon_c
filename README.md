@@ -136,3 +136,5 @@ http://jake.dothome.co.kr
   - mcast 디렉토리
   - ucast
 
+* dma_coherent 디렉토리
+  - dma 전용 메모리 사용 샘플(device tree 참고)
