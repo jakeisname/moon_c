@@ -23,7 +23,7 @@ static int foo_probe(struct platform_device *pdev)
 	foo_t *foo;
 	
 
-	foo = devm_kmalloc(&pdev->dev, sizeof(foo_t), GFP_KERNEL);
+	foo = devm_kzalloc(&pdev->dev, sizeof(foo_t), GFP_KERNEL);
 	if (foo == NULL) 
 		return -1;
 
@@ -32,7 +32,7 @@ static int foo_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, foo);
 
 	/* test for dma buffer allocation */
-	foo->virt_addr = dma_alloc_coherent(&pdev->dev, 100, &foo->dma_addr, GFP_KERNEL);
+	foo->virt_addr = dmam_alloc_coherent(&pdev->dev, 100, &foo->dma_addr, GFP_KERNEL);
 	if (foo->virt_addr == NULL)
 		return -2;
 
@@ -53,7 +53,7 @@ static int foo_remove(struct platform_device *pdev)
 {
 	foo_t *foo = (foo_t *)platform_get_drvdata(pdev);
 
-	dma_free_coherent(&pdev->dev, 100, foo->virt_addr, foo->dma_addr);
+	dmam_free_coherent(&pdev->dev, 100, foo->virt_addr, foo->dma_addr);
 
 	printk("%s\n", __func__);
 
