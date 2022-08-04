@@ -5,11 +5,14 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/module.h>
+#include <linux/platform_device.h>
 
 #define CLKF_INDEX_STARTS_AT_ONE	1
 #define CLKF_INDEX_POWER_OF_TWO		2
 
 struct foo_divider {
+	struct device		*dev;
+	struct clk		*clk;
         struct clk_hw           hw;
         u32			reg;
         u8                      shift;
@@ -337,7 +340,7 @@ const struct clk_ops foo_clk_divider_ops = {
 	.restore_context = clk_divider_restore_context,
 };
 
-static struct clk *_register_divider(struct device *dev, const char *name,
+static struct foo_divider *_register_divider(struct device *dev, const char *name,
 				     const char *parent_name,
 				     unsigned long flags,
 				     u8 shift, u8 width, s8 latch,
@@ -345,7 +348,6 @@ static struct clk *_register_divider(struct device *dev, const char *name,
 				     const struct clk_div_table *table)
 {
 	struct foo_divider *div;
-	struct clk *clk;
 	struct clk_init_data init;
 
 	if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
@@ -356,7 +358,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
 	}
 
 	/* allocate the divider */
-	div = kzalloc(sizeof(*div), GFP_KERNEL);
+	div = devm_kzalloc(dev, sizeof(*div), GFP_KERNEL);
 	if (!div)
 		return ERR_PTR(-ENOMEM);
 
@@ -376,16 +378,16 @@ static struct clk *_register_divider(struct device *dev, const char *name,
 	div->table = table;
 
 	/* register the clock */
-	clk = clk_register(dev, &div->hw);
+	div->clk = clk_register(dev, &div->hw);
+	if (IS_ERR(div->clk)) 
+		div = ERR_PTR(-EIO);
 
-	if (IS_ERR(clk))
-		kfree(div);
-
-	return clk;
+	return div;
 }
 
-static struct clk_div_table *
-__init foo_clk_get_div_table(struct device_node *node)
+
+static struct clk_div_table *foo_clk_get_div_table(struct device *dev, 
+		struct device_node *node)
 {
 	struct clk_div_table *table;
 	const __be32 *divspec;
@@ -415,7 +417,7 @@ __init foo_clk_get_div_table(struct device_node *node)
 		return ERR_PTR(-EINVAL);
 	}
 
-	table = kcalloc(valid_div + 1, sizeof(*table), GFP_KERNEL);
+	table = devm_kcalloc(dev, valid_div + 1, sizeof(*table), GFP_KERNEL);
 
 	if (!table)
 		return ERR_PTR(-ENOMEM);
@@ -478,7 +480,7 @@ static int _get_divider_width(struct device_node *node,
 	return fls(val);
 }
 
-static int __init foo_clk_divider_populate(struct device_node *node,
+static int foo_clk_divider_populate(struct device *dev, struct device_node *node,
 	const struct clk_div_table **table,
 	u32 *flags, u8 *div_flags, u8 *width, u8 *shift, s8 *latch)
 {
@@ -515,10 +517,9 @@ static int __init foo_clk_divider_populate(struct device_node *node,
 	if (of_property_read_bool(node, "foo,set-rate-parent"))
 		*flags |= CLK_SET_RATE_PARENT;
 
-	*table = foo_clk_get_div_table(node);
-
+	*table = foo_clk_get_div_table(dev, node);
 	if (IS_ERR(*table))
-		return PTR_ERR(*table);
+		return -EIO;
 
 	*width = _get_divider_width(node, *table, *div_flags);
 
@@ -527,34 +528,84 @@ static int __init foo_clk_divider_populate(struct device_node *node,
 	return 0;
 }
 
-static void __init of_foo_divider_clk_setup(struct device_node *node)
+static struct foo_divider *_of_foo_divider_clk_setup(struct device *dev,
+			  struct device_node *node)
 {
-	struct clk *clk;
 	const char *parent_name;
 	u8 clk_divider_flags = 0;
 	u8 width = 0;
 	u8 shift = 0;
 	s8 latch = -EINVAL;
-	const struct clk_div_table *table = NULL;
 	u32 flags = 0;
+	int ret;
+	struct foo_divider *foo;
+        const struct clk_div_table *table;
 
 	parent_name = of_clk_get_parent_name(node, 0);
 
-	if (foo_clk_divider_populate(node, &table, &flags,
-				    &clk_divider_flags, &width, &shift, &latch))
-		goto cleanup;
-
-	clk = _register_divider(NULL, node->name, parent_name, flags, 
-				shift, width, latch, clk_divider_flags, table);
-
-	if (!IS_ERR(clk)) {
-		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-		// of_ti_clk_autoidle_setup(node);
-		return;
+	if (foo_clk_divider_populate(dev, node, &table, &flags,
+				    &clk_divider_flags, &width, &shift, &latch)) {
+		return ERR_PTR(-EIO);
 	}
 
-cleanup:
-	kfree(table);
-}
-CLK_OF_DECLARE(divider_clk, "foo,divider-clock", of_foo_divider_clk_setup);
+	foo = _register_divider(dev, node->name, parent_name, flags, 
+				shift, width, latch, clk_divider_flags, table);
+	if (IS_ERR(foo)) 
+		return foo;
 
+	ret = of_clk_add_provider(node, of_clk_src_simple_get, foo->clk);
+	if (!ret) {
+		return foo;	/* success */
+	}
+
+	clk_unregister(foo->clk);
+
+	return ERR_PTR(-EIO);
+}
+
+static int of_foo_divider_clk_remove(struct platform_device *pdev)
+{
+	struct foo_divider *foo = platform_get_drvdata(pdev);
+
+	if (!IS_ERR(foo->clk)) 
+		clk_unregister(foo->clk);
+
+	return 0;
+}
+
+static int of_foo_divider_clk_probe(struct platform_device *pdev)
+{
+	struct foo_divider *foo;
+
+	/*
+	 * This function is not executed when of_fixed_clk_setup
+	 * succeeded.
+	 */
+	foo = _of_foo_divider_clk_setup(&pdev->dev, pdev->dev.of_node);
+	if (IS_ERR(foo))
+		return -EIO;
+
+	platform_set_drvdata(pdev, foo);
+
+	return 0;
+}
+
+static const struct of_device_id of_foo_divider_clk_ids[] = {
+	{ .compatible = "foo,divider-clock" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, of_foo_divider_clk_ids);
+
+static struct platform_driver of_foo_divider_clk_driver = {
+	.driver = {
+		.name = "of_foo_divider_clk",
+		.of_match_table = of_foo_divider_clk_ids,
+	},
+	.probe = of_foo_divider_clk_probe,
+	.remove = of_foo_divider_clk_remove,
+};
+module_platform_driver(of_foo_divider_clk_driver);
+
+MODULE_AUTHOR("Jake, Moon, https://jake.dothome.co.kr");
+MODULE_DESCRIPTION("foo divider clock driver");
+MODULE_LICENSE("GPL");

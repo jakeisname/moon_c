@@ -4,8 +4,11 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/clk/ti.h>
+#include <linux/platform_device.h>
+#include <linux/module.h>
 
 struct foo_mux {
+	struct clk		*clk;
         struct clk_hw           hw;
         u32			reg;
         u32                     *table;
@@ -36,26 +39,26 @@ static void foo_writel(u32 val, u32 *reg)
 
 static u8 foo_clk_mux_get_parent(struct clk_hw *hw)
 {
-	struct foo_mux *mux = to_foo_mux(hw);
+	struct foo_mux *foo = to_foo_mux(hw);
 	int num_parents = clk_hw_get_num_parents(hw);
 	u32 val;
 
-	val = foo_readl(&mux->reg) >> mux->shift;
-	val &= mux->mask;
+	val = foo_readl(&foo->reg) >> foo->shift;
+	val &= foo->mask;
 
-	if (mux->table) {
+	if (foo->table) {
 		int i;
 
 		for (i = 0; i < num_parents; i++)
-			if (mux->table[i] == val)
+			if (foo->table[i] == val)
 				return i;
 		return -EINVAL;
 	}
 
-	if (val && (mux->flags & CLK_MUX_INDEX_BIT))
+	if (val && (foo->flags & CLK_MUX_INDEX_BIT))
 		val = ffs(val) - 1;
 
-	if (val && (mux->flags & CLK_MUX_INDEX_ONE))
+	if (val && (foo->flags & CLK_MUX_INDEX_ONE))
 		val--;
 
 	if (val >= num_parents)
@@ -68,29 +71,29 @@ static u8 foo_clk_mux_get_parent(struct clk_hw *hw)
 
 static int foo_clk_mux_set_parent(struct clk_hw *hw, u8 index)
 {
-	struct foo_mux *mux = to_foo_mux(hw);
+	struct foo_mux *foo = to_foo_mux(hw);
 	u32 val;
 
        	printk("%s: index=%u\n", __func__, index);
 
-	if (mux->table) {
-		index = mux->table[index];
+	if (foo->table) {
+		index = foo->table[index];
 	} else {
-		if (mux->flags & CLK_MUX_INDEX_BIT)
+		if (foo->flags & CLK_MUX_INDEX_BIT)
 			index = (1 << ffs(index));
 
-		if (mux->flags & CLK_MUX_INDEX_ONE)
+		if (foo->flags & CLK_MUX_INDEX_ONE)
 			index++;
 	}
 
-	if (mux->flags & CLK_MUX_HIWORD_MASK) {
-		val = mux->mask << (mux->shift + 16);
+	if (foo->flags & CLK_MUX_HIWORD_MASK) {
+		val = foo->mask << (foo->shift + 16);
 	} else {
-		val = foo_readl(&mux->reg);
-		val &= ~(mux->mask << mux->shift);
+		val = foo_readl(&foo->reg);
+		val &= ~(foo->mask << foo->shift);
 	}
-	val |= index << mux->shift;
-	foo_writel(val, &mux->reg);
+	val |= index << foo->shift;
+	foo_writel(val, &foo->reg);
 
        	printk("%s: index2=%u, val=%u\n", __func__, index, val);
 
@@ -99,22 +102,22 @@ static int foo_clk_mux_set_parent(struct clk_hw *hw, u8 index)
 
 static int clk_mux_save_context(struct clk_hw *hw)
 {
-	struct foo_mux *mux = to_foo_mux(hw);
+	struct foo_mux *foo = to_foo_mux(hw);
 
        	printk("%s: \n", __func__);
 
-	mux->saved_parent = foo_clk_mux_get_parent(hw);
+	foo->saved_parent = foo_clk_mux_get_parent(hw);
 
 	return 0;
 }
 
 static void clk_mux_restore_context(struct clk_hw *hw)
 {
-	struct foo_mux *mux = to_foo_mux(hw);
+	struct foo_mux *foo = to_foo_mux(hw);
 
        	printk("%s: \n", __func__);
 
-	foo_clk_mux_set_parent(hw, mux->saved_parent);
+	foo_clk_mux_set_parent(hw, foo->saved_parent);
 }
 
 const struct clk_ops foo_clk_mux_ops = {
@@ -125,19 +128,18 @@ const struct clk_ops foo_clk_mux_ops = {
 	.restore_context = clk_mux_restore_context,
 };
 
-static struct clk *_register_mux(struct device *dev, const char *name,
+static struct foo_mux *_register_mux(struct device *dev, const char *name,
 				 const char * const *parent_names,
 				 u8 num_parents, unsigned long flags,
 				 u8 shift, u32 mask,
 				 s8 latch, u8 clk_mux_flags, u32 *table)
 {
-	struct foo_mux *mux;
-	struct clk *clk;
+	struct foo_mux *foo;
 	struct clk_init_data init;
 
-	/* allocate the mux */
-	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-	if (!mux)
+	/* allocate the foo_mux */
+	foo = devm_kzalloc(dev, sizeof(*foo), GFP_KERNEL);
+	if (!foo)
 		return ERR_PTR(-ENOMEM);
 
 	init.name = name;
@@ -147,24 +149,25 @@ static struct clk *_register_mux(struct device *dev, const char *name,
 	init.num_parents = num_parents;
 
 	/* struct clk_mux assignments */
-	mux->shift = shift;
-	mux->mask = mask;
-	mux->latch = latch;
-	mux->flags = clk_mux_flags;
-	mux->table = table;
-	mux->hw.init = &init;
+	foo->shift = shift;
+	foo->mask = mask;
+	foo->latch = latch;
+	foo->flags = clk_mux_flags;
+	foo->table = table;
+	foo->hw.init = &init;
 
-	clk = clk_register(dev, &mux->hw);
+	foo->clk = clk_register(dev, &foo->hw);
+	if (IS_ERR(foo->clk)) 
+		return ERR_PTR(-EIO);
 
-	if (IS_ERR(clk))
-		kfree(mux);
-
-	return clk;
+	/* success */
+	return foo;
 }
 
-static void of_mux_clk_setup(struct device_node *node)
+static struct foo_mux *_of_foo_mux_clk_setup(struct device *dev, 
+		struct device_node *node)
 {
-	struct clk *clk;
+	struct foo_mux *foo;
 	unsigned int num_parents;
 	const char **parent_names;
 	u8 clk_mux_flags = 0;
@@ -176,11 +179,11 @@ static void of_mux_clk_setup(struct device_node *node)
 	num_parents = of_clk_get_parent_count(node);
 	if (num_parents < 2) {
 		pr_err("mux-clock %pOFn must have parents\n", node);
-		return;
+		return ERR_PTR(-ENOMEM);
 	}
-	parent_names = kzalloc((sizeof(char *) * num_parents), GFP_KERNEL);
+	parent_names = devm_kzalloc(dev, (sizeof(char *) * num_parents), GFP_KERNEL);
 	if (!parent_names)
-		goto cleanup;
+		return ERR_PTR(-EIO);
 
 	of_clk_parent_fill(node, parent_names, num_parents);
 
@@ -201,15 +204,58 @@ static void of_mux_clk_setup(struct device_node *node)
 
 	mask = (1 << fls(mask)) - 1;
 
-	clk = _register_mux(NULL, node->name, parent_names, num_parents,
+	foo = _register_mux(dev, node->name, parent_names, num_parents,
 			    flags, shift, mask, latch, clk_mux_flags,
 			    NULL);
+	if (!IS_ERR(foo))
+		of_clk_add_provider(node, of_clk_src_simple_get, foo->clk);
 
-	if (!IS_ERR(clk))
-		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-
-cleanup:
-	kfree(parent_names);
+	return foo;
 }
-CLK_OF_DECLARE(mux_clk, "foo,mux-clock", of_mux_clk_setup);
 
+static int of_foo_mux_clk_remove(struct platform_device *pdev)
+{
+	struct foo_mux *foo = platform_get_drvdata(pdev);
+
+	if (!IS_ERR(foo->clk))
+		clk_unregister(foo->clk);
+
+	return 0;
+}
+
+static int of_foo_mux_clk_probe(struct platform_device *pdev)
+{
+	struct foo_mux *foo;
+
+	/*
+	 * This function is not executed when of_fixed_clk_setup
+	 * succeeded.
+	 */
+	foo = _of_foo_mux_clk_setup(&pdev->dev, pdev->dev.of_node);
+	if (IS_ERR(foo))
+		return -EIO;
+
+	platform_set_drvdata(pdev, foo);
+
+	return 0;
+}
+
+static const struct of_device_id of_foo_mux_clk_ids[] = {
+	{ .compatible = "foo,mux-clock" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, of_foo_mux_clk_ids);
+
+static struct platform_driver of_foo_mux_clk_driver = {
+	.driver = {
+		.name = "of_foo_mux_clk",
+		.of_match_table = of_foo_mux_clk_ids,
+	},
+	.probe = of_foo_mux_clk_probe,
+	.remove = of_foo_mux_clk_remove,
+};
+module_platform_driver(of_foo_mux_clk_driver);
+
+MODULE_AUTHOR("Jake, Moon, https://jake.dothome.co.kr");
+MODULE_DESCRIPTION("foo mux clock driver");
+MODULE_LICENSE("GPL");

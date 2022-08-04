@@ -341,56 +341,51 @@
 		stdout-path = "/pl011@9000000";
 	};
 
-	fooclk1 {
-		phandle = <0x8100>;
-		clock-output-names = "fooclk1";
-		clock-frequency = <1000000>;
-		#clock-cells = <0x0>;
-		compatible = "fixed-clock";
-	};
+        fooclk1: fooclk1 {
+                clock-output-names = "fooclk1";
+                clock-frequency = <1000000>;
+                #clock-cells = <0x0>;
+                compatible = "fixed-clock";
+        };
 
-	fooclk2 {
-		phandle = <0x8200>;
-		clock-output-names = "fooclk2";
-		clocks = <0x8100>;
-		#clock-cells = <0x0>;
-		compatible = "foo,divider-clock";
-		foo,max-div = <32>;
-	};
+        fooclk2: fooclk2 {
+                clock-output-names = "fooclk2";
+                clocks = <&fooclk1>;
+                #clock-cells = <0x0>;
+                compatible = "foo,divider-clock";
+                foo,max-div = <32>;
+        };
 
-	fooclk3 {
-		phandle = <0x8300>;
-		clock-output-names = "fooclk3";
-		clocks = <0x8200>;
-		#clock-cells = <0x0>;
-		compatible = "foo,divider-clock";
-		foo,max-div = <8>;
-		foo,set-rate-parent;
-	};
+        fooclk3: fooclk3 {
+                clock-output-names = "fooclk3";
+                clocks = <&fooclk2>;
+                #clock-cells = <0x0>;
+                compatible = "foo,divider-clock";
+                foo,max-div = <8>;
+                foo,set-rate-parent;
+        };
 
-	fooclk4 {
-		phandle = <0x8400>;
-		clock-output-names = "fooclk4";
-		clocks = <0x8200>;
-		#clock-cells = <0x0>;
-		compatible = "foo,divider-clock";
-		foo,max-div = <5>;
-		foo,index-power-of-two;
-	};
+        fooclk4: fooclk4 {
+                clock-output-names = "fooclk4";
+                clocks = <&fooclk2>;
+                #clock-cells = <0x0>;
+                compatible = "foo,divider-clock";
+                foo,max-div = <5>;
+                foo,index-power-of-two;
+        };
 
-	fooclk5 {
-		phandle = <0x8500>;
-		clock-output-names = "fooclk5";
-		clocks = <0x8100 0x8200 0x8300 0x8400>;
-		#clock-cells = <0x0>;
-		compatible = "foo,mux-clock";
-	};
+        fooclk5: fooclk5 {
+                clock-output-names = "fooclk5";
+                clocks = <&fooclk1 &fooclk2 &fooclk3 &fooclk4>;
+                #clock-cells = <0x0>;
+                compatible = "foo,mux-clock";
+        };
 
-	foo {
-		compatible = "foo,foo";
-		clock-names = "fooclk1", "fooclk2", "fooclk3", "fooclk4", "fooclk5";
-		clocks = <0x8100 0x8200 0x8300 0x8400 0x8500>;
-	};
+        foo {
+                compatible = "foo,foo";
+                clock-names = "fooclk1", "fooclk2", "fooclk3", "fooclk4", "fooclk5";
+                clocks = <&fooclk1 &fooclk2 &fooclk3 &fooclk4 &fooclk5>;
+        };
 
 	clk_f1: clk_f1 {
 		clock-output-names = "clk_f1";
