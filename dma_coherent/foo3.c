@@ -9,7 +9,8 @@
 #include <linux/dma-direct.h>
 #include <linux/of_reserved_mem.h>
 
-#define DMA_ALLOC_SIZE	(2 * 4096)
+//#define DMA_ALLOC_SIZE	(2 * 4096)
+#define DMA_ALLOC_SIZE	(2048)
 
 struct foo {
 	struct platform_device *pdev;
