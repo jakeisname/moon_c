@@ -138,3 +138,7 @@ http://jake.dothome.co.kr
 
 * dma_coherent 디렉토리
   - dma 전용 메모리 사용 샘플(device tree 참고)
+
+* irq_inject 디렉토리
+  - 인터럽트 injection 샘플
+
