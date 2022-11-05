@@ -5,9 +5,8 @@ virt.dts
         ...
 
         foo_irq {
-              compatible = "foo,foo-irq";
-                interrupt-controller;
-                interrupts = <0 100 1>; /* SPI, INTID=132, rising edge */
+		compatible = "foo,foo-irq";
+		interrupts = <0 100 1>; /* SPI, INTID=132, rising edge */
         };
 
 	...
